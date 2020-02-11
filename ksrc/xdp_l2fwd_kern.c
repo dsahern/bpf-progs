@@ -100,27 +100,18 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	memset(&key, 0, sizeof(key));
 	memcpy(key.mac, eth->h_dest, ETH_ALEN);
 
-#ifdef HAVE_RX_VLAN_IN_CTX
-	if (ctx->vlan_tci_rx) {
-		key.vlan = ctx->vlan_tci_rx & VLAN_VID_MASK;
-	} else
-#endif
-	{
-		/* no vlan means directed at host */
-		if (eth->h_proto != htons(ETH_P_8021Q))
-			return XDP_PASS;
+	if (eth->h_proto != htons(ETH_P_8021Q))
+		return XDP_PASS;
 
-		vhdr = nh;
-		if (vhdr + 1 > data_end) {
-			xdp_stats_drop(ctx);
-			return XDP_DROP;
-		}
-
-		key.vlan = ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK;
-		h_proto = vhdr->h_vlan_encapsulated_proto;
+	vhdr = nh;
+	if (vhdr + 1 > data_end) {
+		xdp_stats_drop(ctx);
+		return XDP_DROP;
 	}
 
-	/* our systems expect a vlan tag for VM traffic */
+	key.vlan = ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK;
+	h_proto = vhdr->h_vlan_encapsulated_proto;
+
 	if (key.vlan == 0)
 		return XDP_PASS;
 
@@ -148,6 +139,7 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 		eth->h_proto = h_proto;
 	}
 
+	/* requires newer kernel to verify redirect index */
 	//if (!bpf_map_lookup_elem(&xdp_fwd_ports, &ifindex))
 	//	return XDP_PASS;
 
