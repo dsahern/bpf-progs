@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * perf_event_poller_multi and related functions and structures are based
+/* perf_event_poller_multi and related functions and structures are based
  * on tools/testing/selftests/bpf/trace_helpers.c from around the v5.3
  * kernel and then adapted to the needs of the commands in this repo.
  *
- * Rest of the functions are for time sorting perf events across cpus and
- * helpers developed as common code across various commands.
+ * Rest of the functions are were added for time sorting perf events across
+ * cpus, and helpers developed as common code across various commands.
  */
 #include <linux/perf_event.h>
 #include <linux/list.h>

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Monitor packet latency. Latency is measured as the time between
  * PTP timestamping in the NIC and handoff to process (currently
- * on users of skb_copy_datagram_iovec - e.g., virtual machines).
+ * only users of skb_copy_datagram_iovec - e.g., virtual machines).
  *
  * Data is collected as a histogram per process id with samples
- * exceeding a * threshold sent to userspace for further analysis
+ * exceeding a threshold sent to userspace for further analysis
  * (e.g., to show affected flow).
  *
  * Userspace updates control map with a conversion between ptp

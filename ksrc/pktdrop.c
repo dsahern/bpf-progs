@@ -100,6 +100,7 @@ int bpf_kfree_skb(struct kfree_skb_args *ctx)
 	return 0;
 }
 
+/* capture network namespace delete */
 SEC("kprobe/fib_net_exit")
 int bpf_fib_net_exit(struct pt_regs *ctx)
 {

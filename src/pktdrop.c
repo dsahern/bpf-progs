@@ -738,7 +738,7 @@ static void print_usage(char *prog)
 	"	-r rate        display rate (seconds) to dump summary\n"
 	"	-t num         only display entries with drops more than num\n"
 	"	-i             ignore kprobe error (4.14 can not install kprobe on fib_net_exit)\n"
-	"       -m count       set number of pages in perf buffers\n"
+	"	-m count       set number of pages in perf buffers\n"
 	, basename(prog));
 }
 
