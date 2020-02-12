@@ -39,6 +39,7 @@ struct task {
 static bool done;
 static u64 display_rate = 10 * NSEC_PER_SEC;
 static u64 latency_gen_sample = 200 * NSEC_PER_USEC;
+static pid_t disp_pid;
 
 static struct rb_root all_tasks;
 
@@ -258,6 +259,9 @@ static void process_event(struct data *data)
 		if (!data->tstamp)
 			return;
 
+		if (disp_pid && data->pid != disp_pid)
+			return;
+
 		/* unsigned char means print header every 255 events */
 		if (!num_events)
 			print_header();
@@ -340,6 +344,9 @@ static void pktlat_dump_hist(void)
 		if (bpf_map_lookup_elem(hist_map_fd, &key, &val))
 			goto next;
 
+		if (disp_pid && disp_pid != key.pid)
+			goto next;
+
 		task = get_task(key.pid, true);
 		if (!task) {
 			fprintf(stderr,
@@ -416,6 +423,7 @@ static void print_usage(char *prog)
 	printf(
 	"usage: %s OPTS\n\n"
 	"	-f bpf-file    bpf filename to load\n"
+	"	-p pid         only show data for specific pid\n"
 	"	-l time        latency at which to generate samples (usec, default: 200)\n"
 	"	-t rate        time rate (seconds) to dump stats\n"
 	"	-s             show samples\n"
@@ -435,22 +443,30 @@ int main(int argc, char **argv)
 	struct bpf_object *obj;
 	struct bpf_map *map;
 	int nevents = 1000;
-	int rc, r;
+	int rc, tmp;
 
-	while ((rc = getopt(argc, argv, "f:t:l:s")) != -1)
+	while ((rc = getopt(argc, argv, "f:p:t:l:s")) != -1)
 	{
 		switch(rc) {
 		case 'f':
 			objfile = optarg;
 			filename_set = true;
 			break;
+		case 'p':
+			tmp = atoi(optarg);
+			if (!tmp) {
+				fprintf(stderr, "Invalid process id\n");
+				return 1;
+			}
+			disp_pid = tmp;
+			break;
 		case 't':
-			r = atoi(optarg);
-			if (!r) {
+			tmp = atoi(optarg);
+			if (!tmp) {
 				fprintf(stderr, "Invalid display rate\n");
 				return 1;
 			}
-			display_rate = r * NSEC_PER_SEC;
+			display_rate = tmp * NSEC_PER_SEC;
 			break;
 		case 'l':
 			latency_gen_sample = atoi(optarg) * NSEC_PER_USEC;
