@@ -389,107 +389,6 @@ int configure_perf_event_channel(struct bpf_object *obj, int nevents)
 	return 0;
 }
 
-static int kprobe_event_type(void)
-{
-	static int kprobe_type = -1;
-	char filename[] = "/sys/bus/event_source/devices/kprobe/type";
-	char buf[64] = {};
-	int fd, n;
-
-	if (kprobe_type > 0)
-		return kprobe_type;
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
-			filename);
-		return -1;
-	}
-
-	n = read(fd, buf, sizeof(buf)-1);
-	if (n < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
-			filename);
-	} else {
-		kprobe_type = atoi(buf);
-	}
-	close(fd);
-
-	return kprobe_type;
-}
-
-int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
-{
-	struct perf_event_attr attr = {
-		.sample_type = PERF_SAMPLE_RAW,
-		.size = sizeof(attr),
-		.wakeup_events = 1, /* get an fd notification for every event */
-		.sample_period = 1,
-		.config = retprobe ? 1ULL : 0, /* 0 for kprobe; 1 for retprobe */
-		.kprobe_func = (uint64_t) (unsigned long) func,
-		.kprobe_addr = addr,
-	};
-	int fd, err;
-
-	attr.type = kprobe_event_type();
-	if (attr.type < 0)
-		return 1;
-
-	fd = sys_perf_event_open(&attr, 0, PERF_FLAG_FD_CLOEXEC);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open kprobe event: %d %s\n",
-			fd, strerror(errno));
-		return fd;
-	}
-	err = ioctl(fd, PERF_EVENT_IOC_SET_BPF, prog_fd);
-	if (err) {
-		fprintf(stderr, "failed to attach bpf: %d %s\n",
-			err, strerror(errno));
-		close(fd);
-		return -1;
-	}
-
-	ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
-
-	return fd;
-}
-
-/* probes is a NULL terminated array of function names to put
- * kprobe. bpf program is expected to be named kprobe/%s.
- * If retprobe is set, bpf program name is expected to be
- * "kprobe/%s_ret"
- */
-int do_kprobe(struct bpf_object *obj, const char *probes[], int retprobe)
-{
-        struct bpf_program *prog;
-        int prog_fd, fd;
-        int i;
-
-        for (i = 0; probes[i]; ++i) {
-                char buf[256];
-
-                snprintf(buf, sizeof(buf), "kprobe/%s%s",
-			 probes[i], retprobe ? "_ret" : "");
-
-		prog = bpf_object__find_program_by_title(obj, buf);
-		if (!prog) {
-			printf("Failed to get prog in obj file\n");
-			return 1;
-		}
-		prog_fd = bpf_program__fd(prog);
-
-		fd = kprobe_perf_event(prog_fd, probes[i], 0, retprobe);
-		if (fd < 0) {
-			fprintf(stderr,
-				"Failed to create perf_event on %s\n",
-				probes[i]);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
 static int tp_perf_event(int prog_fd, __u64 config)
 {
 	struct perf_event_attr attr = {
@@ -587,6 +486,107 @@ int do_tracepoint(struct bpf_object *obj, const char *tps[])
 			fprintf(stderr,
 				"Failed to create perf_event on %s: %d %s\n",
 				tps[i], fd, strerror(errno));
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+static int kprobe_event_type(void)
+{
+	static int kprobe_type = -1;
+	char filename[] = "/sys/bus/event_source/devices/kprobe/type";
+	char buf[64] = {};
+	int fd, n;
+
+	if (kprobe_type > 0)
+		return kprobe_type;
+
+	fd = open(filename, O_RDONLY);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
+			filename);
+		return -1;
+	}
+
+	n = read(fd, buf, sizeof(buf)-1);
+	if (n < 0) {
+		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
+			filename);
+	} else {
+		kprobe_type = atoi(buf);
+	}
+	close(fd);
+
+	return kprobe_type;
+}
+
+int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
+{
+	struct perf_event_attr attr = {
+		.sample_type = PERF_SAMPLE_RAW,
+		.size = sizeof(attr),
+		.wakeup_events = 1, /* get an fd notification for every event */
+		.sample_period = 1,
+		.config = retprobe ? 1ULL : 0, /* 0 for kprobe; 1 for retprobe */
+		.kprobe_func = (uint64_t) (unsigned long) func,
+		.kprobe_addr = addr,
+	};
+	int fd, err;
+
+	attr.type = kprobe_event_type();
+	if (attr.type < 0)
+		return 1;
+
+	fd = sys_perf_event_open(&attr, 0, PERF_FLAG_FD_CLOEXEC);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to open kprobe event: %d %s\n",
+			fd, strerror(errno));
+		return fd;
+	}
+	err = ioctl(fd, PERF_EVENT_IOC_SET_BPF, prog_fd);
+	if (err) {
+		fprintf(stderr, "failed to attach bpf: %d %s\n",
+			err, strerror(errno));
+		close(fd);
+		return -1;
+	}
+
+	ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+
+	return fd;
+}
+
+/* probes is a NULL terminated array of function names to put
+ * kprobe. bpf program is expected to be named kprobe/%s.
+ * If retprobe is set, bpf program name is expected to be
+ * "kprobe/%s_ret"
+ */
+int do_kprobe(struct bpf_object *obj, const char *probes[], int retprobe)
+{
+        struct bpf_program *prog;
+        int prog_fd, fd;
+        int i;
+
+        for (i = 0; probes[i]; ++i) {
+                char buf[256];
+
+                snprintf(buf, sizeof(buf), "kprobe/%s%s",
+			 probes[i], retprobe ? "_ret" : "");
+
+		prog = bpf_object__find_program_by_title(obj, buf);
+		if (!prog) {
+			printf("Failed to get prog in obj file\n");
+			return 1;
+		}
+		prog_fd = bpf_program__fd(prog);
+
+		fd = kprobe_perf_event(prog_fd, probes[i], 0, retprobe);
+		if (fd < 0) {
+			fprintf(stderr,
+				"Failed to create perf_event on %s\n",
+				probes[i]);
 			return 1;
 		}
 	}
