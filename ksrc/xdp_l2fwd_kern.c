@@ -29,12 +29,6 @@ struct bpf_map_def SEC("maps") fdb_map = {
 	.max_entries = 512,
 };
 
-struct xdp_stats {
-        __u64 bytes_fwd;
-        __u64 pkts_fwd;
-        __u64 dropped;
-};
-
 struct bpf_map_def SEC("maps") stats_map = {
 	.type		= BPF_MAP_TYPE_PERCPU_ARRAY,
 	.key_size	= sizeof(u32),
