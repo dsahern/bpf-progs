@@ -504,11 +504,8 @@ static int kprobe_event_type(void)
 		return kprobe_type;
 
 	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
-			filename);
+	if (fd < 0)
 		return -1;
-	}
 
 	n = read(fd, buf, sizeof(buf)-1);
 	if (n < 0) {
@@ -522,7 +519,11 @@ static int kprobe_event_type(void)
 	return kprobe_type;
 }
 
-int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
+/* modern way to do ebpf with kprobe - create the probe
+ * with perf_event_open and attach program
+ */
+static int __kprobe_perf_event(int prog_fd, const char *func, u64 addr,
+			       int retprobe, int attr_type)
 {
 	struct perf_event_attr attr = {
 		.sample_type = PERF_SAMPLE_RAW,
@@ -532,12 +533,9 @@ int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
 		.config = retprobe ? 1ULL : 0, /* 0 for kprobe; 1 for retprobe */
 		.kprobe_func = (uint64_t) (unsigned long) func,
 		.kprobe_addr = addr,
+		.type = attr_type,
 	};
 	int fd, err;
-
-	attr.type = kprobe_event_type();
-	if (attr.type < 0)
-		return 1;
 
 	fd = sys_perf_event_open(&attr, 0, PERF_FLAG_FD_CLOEXEC);
 	if (fd < 0) {
@@ -556,6 +554,17 @@ int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
 	ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
 
 	return fd;
+}
+
+int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
+{
+	int attr_type;
+
+	attr_type = kprobe_event_type();
+	if (attr_type < 0)
+		return -1;
+
+	return __kprobe_perf_event(prog_fd, func, addr, retprobe, attr_type);
 }
 
 /* probes is a NULL terminated array of function names to put
