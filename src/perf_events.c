@@ -421,14 +421,18 @@ static int tp_perf_event(int prog_fd, __u64 config)
 	return fd;
 }
 
-static int tp_event_id(const char *event)
+static int tp_event_id(const char *event, bool probe)
 {
 	char filename[PATH_MAX];
 	int fd, n, id = -1;
 	char buf[64] = {};
 
-	snprintf(filename, sizeof(filename),
-		 "/sys/kernel/debug/tracing/events/%s/id", event);
+	if (probe)
+		snprintf(filename, sizeof(filename),
+			 "/sys/kernel/debug/tracing/events/probe/%s/id", event);
+	else
+		snprintf(filename, sizeof(filename),
+			 "/sys/kernel/debug/tracing/events/%s/id", event);
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
@@ -453,7 +457,7 @@ int tracepoint_perf_event(int prog_fd, const char *name)
 {
 	int id;
 
-	id = tp_event_id(name);
+	id = tp_event_id(name, false);
 	if (id < 0)
 		return 1;
 
@@ -609,7 +613,7 @@ static int syscall_event_id(const char *name)
 
 	snprintf(sysname, sizeof(sysname), "syscalls/%s", name);
 
-	return tp_event_id(sysname);
+	return tp_event_id(sysname, false);
 }
 
 int syscall_perf_event(int prog_fd, const char *name)
