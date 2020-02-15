@@ -8,6 +8,7 @@ MODS += $(OBJDIR)opensnoop
 
 MODS += $(OBJDIR)pktdrop
 MODS += $(OBJDIR)pktlatency
+MODS += $(OBJDIR)ovslatency
 
 MODS += $(OBJDIR)xdp_dummy
 

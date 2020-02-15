@@ -26,6 +26,7 @@ MODS += $(OBJDIR)opensnoop.o
 
 MODS += $(OBJDIR)pktdrop.o
 MODS += $(OBJDIR)pktlatency.o
+MODS += $(OBJDIR)ovslatency.o
 
 MODS += $(OBJDIR)xdp_l2fwd_kern.o
 MODS += $(OBJDIR)xdp_dummy_kern.o
