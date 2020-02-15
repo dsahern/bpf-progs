@@ -497,6 +497,35 @@ int do_tracepoint(struct bpf_object *obj, const char *tps[])
 	return 0;
 }
 
+/* expect kprobes to exist and with the naming convention
+ * <name> for entry and <name>_ret for return probe
+ */
+static int kprobe_perf_event_legacy(int prog_fd, const char *name,
+				    int retprobe)
+{
+	char buf[128];
+	int id;
+
+	if (strlen(name) + 5 > sizeof(buf)) {
+		fprintf(stderr,
+			"buf size too small in kprobe_perf_event_legacy\n");
+		return -1;
+	}
+	if (retprobe)
+		snprintf(buf, sizeof(buf), "%s_ret", name);
+	else
+		snprintf(buf, sizeof(buf), "%s", name);
+
+	id = tp_event_id(buf, true);
+	if (id < 0) {
+		fprintf(stderr,
+			"Legacy kprobe interface expects kprobe to already exist\n");
+		return -1;
+	}
+
+	return tp_perf_event(prog_fd, id);
+}
+
 static int kprobe_event_type(void)
 {
 	static int kprobe_type = -1;
@@ -566,7 +595,7 @@ int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
 
 	attr_type = kprobe_event_type();
 	if (attr_type < 0)
-		return -1;
+		return kprobe_perf_event_legacy(prog_fd, func, retprobe);
 
 	return __kprobe_perf_event(prog_fd, func, addr, retprobe, attr_type);
 }
