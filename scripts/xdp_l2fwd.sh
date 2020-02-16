@@ -154,6 +154,9 @@ unload_usage="${CMD} unload"
 do_unload()
 {
 	local obj
+	local progid
+	local devs
+	local d
 
 	if [ "${1}" = "-h" ]
 	then
@@ -164,11 +167,22 @@ do_unload()
 	obj=$1
 	[ -z "$obj" ] && obj=${OBJFILE}
 
-	sudo stat ${BPFFS_PATH} >/dev/null 2>&1
+
+	progid=$(get_prog_id ${PROG_NAME} 2>/dev/null)
 	if [ $? -ne 0 ]
 	then
-		echo "program not loaded" >&2
-		return 1
+		echo "${PROG_NAME} is not loaded"
+		return 0
+	fi
+
+	devs=$(ip -o li show | awk '$0 ~ "prog/xdp id '${progid}'"{printf "%s ", $2}')
+	if [ -n "${devs}" ]
+	then
+		devs="${devs//:/}"
+		for d in ${devs}
+		do
+			${BPFTOOL} net detach xdp dev ${d}
+		done
 	fi
 
 	sudo rm -f ${BPFFS_PATH}
