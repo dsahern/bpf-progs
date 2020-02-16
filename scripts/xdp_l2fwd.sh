@@ -21,8 +21,21 @@ BPFFS_PATH=/sys/fs/bpf/${PROG_NAME}
 # vlan is in HEX without leading 0x
 CONFIG=$HOME/.vm-config
 
+VERBOSE=0
+
 ################################################################################
 # helpers
+
+run_cmd()
+{
+	local cmd="$*"
+
+	if [ "$VERBOSE" = "1" ]
+	then
+		echo "COMMAND: $cmd" >&2
+	fi
+	eval $cmd
+}
 
 get_prog_id()
 {
@@ -80,7 +93,7 @@ map_dump()
 
 	echo
 	echo "Map: $desc"
-	${BPFTOOL} map dump id ${mapid} | grep -v '<no entry>'
+	run_cmd ${BPFTOOL} map dump id ${mapid} | grep -v '<no entry>'
 }
 
 get_dev_idx()
@@ -146,7 +159,7 @@ do_load()
 		return 1
 	fi
 
-	${BPFTOOL} prog load ${obj} ${BPFFS_PATH}
+	run_cmd ${BPFTOOL} prog load ${obj} ${BPFFS_PATH}
 }
 
 unload_usage="${CMD} unload"
@@ -181,11 +194,11 @@ do_unload()
 		devs="${devs//:/}"
 		for d in ${devs}
 		do
-			${BPFTOOL} net detach xdp dev ${d}
+			run_cmd ${BPFTOOL} net detach xdp dev ${d}
 		done
 	fi
 
-	sudo rm -f ${BPFFS_PATH}
+	run_cmd sudo rm -f ${BPFFS_PATH}
 }
 
 attach_usage="${CMD} attach host-device(s)"
@@ -212,7 +225,7 @@ do_attach()
 
 	for dev in $*
 	do
-		${BPFTOOL} net attach xdp id ${progid} dev ${dev}
+		run_cmd ${BPFTOOL} net attach xdp id ${progid} dev ${dev}
 	done
 }
 
@@ -234,7 +247,7 @@ do_detach()
 
 	for dev in $*
 	do
-		${BPFTOOL} net detach xdp dev ${dev}
+		run_cmd ${BPFTOOL} net detach xdp dev ${dev}
 	done
 
 }
@@ -313,10 +326,10 @@ do_add()
 	fdbmap=$(get_map_id ${FDB_MAP_NAME})
 	exit_non_zero_rc $?
 
-	${BPFTOOL} map update id ${devmap} key hex ${fdbdev} value hex ${portdev}
+	run_cmd ${BPFTOOL} map update id ${devmap} key hex ${fdbdev} value hex ${portdev}
 	if [ $? -eq 0 ]
 	then
-		${BPFTOOL} map update id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2} value hex ${fdbdev}
+		run_cmd ${BPFTOOL} map update id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2} value hex ${fdbdev}
 		if [ $? -ne 0 ]
 		then
 			echo "Failed to add entry to fdb map"
@@ -382,8 +395,8 @@ do_delete()
 	exit_non_zero_rc $?
 
 	dev=$(${BPFTOOL} map lookup id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2} | sed 's/key.*value://')
-	${BPFTOOL} map delete id ${devmap} key hex ${dev}
-	${BPFTOOL} map delete id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2}
+	run_cmd ${BPFTOOL} map delete id ${devmap} key hex ${dev}
+	run_cmd ${BPFTOOL} map delete id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2}
 }
 
 fdb_dump()
@@ -395,7 +408,7 @@ fdb_dump()
 
 	echo
 	echo "FDB entries:"
-	${BPFTOOL} map dump id ${mapid} | egrep '^key:' | \
+	run_cmd ${BPFTOOL} map dump id ${mapid} | egrep '^key:' | \
 	while read key o1 o2 o3 o4 o5 o6 v1 v2 value i1 i2 i3 i4
 	do
 		vlan="0x${v2}${v1}"
@@ -415,7 +428,7 @@ ports_dump()
 
 	echo
 	echo "Port entries:"
-	${BPFTOOL} map dump id ${mapid} | egrep '^key:' | grep -v '<no entry>' | \
+	run_cmd ${BPFTOOL} map dump id ${mapid} | egrep '^key:' | grep -v '<no entry>' | \
 	while read key o1 o2 o3 o4 value i1 i2 i3 i4
 	do
 		idx="0x${o4}${o3}${o2}${o1}"
@@ -497,6 +510,12 @@ EOF
 
 ################################################################################
 # main
+
+if [ "$1" = "-v" ]
+then
+	VERBOSE=1
+	shift
+fi
 
 ACTION=$1
 shift
