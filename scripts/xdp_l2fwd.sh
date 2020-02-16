@@ -246,18 +246,22 @@ do_add()
 	local devmap
 	local fdbmap
 	local dev
+	local fdbdev
+	local portdev
 	local devidx
+	local fdbidx="0"
 	local mac
 	local vlan
 	local vm
 	local tmp
 
-	while getopts :d:m:v:h o
+	while getopts :d:m:v:i:h o
 	do
 		case $o in
 		d) dev=$OPTARG;;
 		m) mac=$OPTARG;;
 		v) vlan=$OPTARG;;
+		i) fdbidx=$OPTARG;;
 		h) echo "${add_usage}"; exit 0;;
 		*) echo "${add_usage}" >&2; exit 1;;
 		esac
@@ -295,8 +299,13 @@ do_add()
 
 	devidx=$(get_dev_idx ${dev})
 	exit_non_zero_rc $?
+
+	[ ${fdbidx} = "0" ] && fdbidx=${devidx}
+	fdbidx=$(printf "%08x" ${fdbidx})
+	fdbdev="${fdbidx:6:2} ${fdbidx:4:2} ${fdbidx:2:2} ${fdbidx:0:2}"
+
 	devidx=$(printf "%08x" ${devidx})
-	dev="${devidx:6:2} ${devidx:4:2} ${devidx:2:2} ${devidx:0:2}"
+	portdev="${devidx:6:2} ${devidx:4:2} ${devidx:2:2} ${devidx:0:2}"
 
 	# lookup device and fdb maps
 	devmap=$(get_map_id ${PORTS_MAP_NAME})
@@ -304,10 +313,10 @@ do_add()
 	fdbmap=$(get_map_id ${FDB_MAP_NAME})
 	exit_non_zero_rc $?
 
-	${BPFTOOL} map update id ${devmap} key hex ${dev} value hex ${dev}
+	${BPFTOOL} map update id ${devmap} key hex ${fdbdev} value hex ${portdev}
 	if [ $? -eq 0 ]
 	then
-		${BPFTOOL} map update id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2} value hex ${dev}
+		${BPFTOOL} map update id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2} value hex ${fdbdev}
 		if [ $? -ne 0 ]
 		then
 			echo "Failed to add entry to fdb map"
@@ -328,16 +337,14 @@ do_delete()
 	local devmap
 	local fdbmap
 	local dev
-	local devidx
 	local mac
 	local vlan
 	local vm
 	local tmp
 
-	while getopts :d:m:v:h o
+	while getopts :m:v:h o
 	do
 		case $o in
-		d) dev=$OPTARG;;
 		m) mac=$OPTARG;;
 		v) vlan=$OPTARG;;
 		h) echo "${delete_usage}"; exit 0;;
@@ -355,13 +362,12 @@ do_delete()
 
 		vlan=$2
 		mac=$3
-		dev=$4
-		if [ -z "${vlan}" -o -z "${mac}" -o -z "${dev}" ]
+		if [ -z "${vlan}" -o -z "${mac}" ]
 		then
 			echo "Invalid config file entry for ${vm}"
 			exit 1
 		fi
-	elif [ -z "${vlan}" -o -z "${mac}" -o -z "${dev}" ]
+	elif [ -z "${vlan}" -o -z "${mac}" ]
 	then
 		echo "${delete_usage}"
 		exit 1
@@ -369,17 +375,13 @@ do_delete()
 	# convert vlan to 4 digit hex
 	vlan=$(printf "%04x" ${vlan})
 
-	devidx=$(get_dev_idx ${dev})
-	exit_non_zero_rc $?
-	devidx=$(printf "%08x" ${devidx})
-	dev="${devidx:6:2} ${devidx:4:2} ${devidx:2:2} ${devidx:0:2}"
-
 	# lookup device and fdb maps
 	devmap=$(get_map_id ${PORTS_MAP_NAME})
 	exit_non_zero_rc $?
 	fdbmap=$(get_map_id ${FDB_MAP_NAME})
 	exit_non_zero_rc $?
 
+	dev=$(${BPFTOOL} map lookup id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2} | sed 's/key.*value://')
 	${BPFTOOL} map delete id ${devmap} key hex ${dev}
 	${BPFTOOL} map delete id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2}
 }
