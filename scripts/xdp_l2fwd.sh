@@ -112,11 +112,12 @@ check_offload()
 	local dev=$1
 	local status
 
-	status=$(ethtool -k eth0  | awk '$1 == "rx-vlan-offload:" {print $2}')
+	status=$(ethtool -k ${dev} | awk '$1 == "rx-vlan-offload:" {print $2}')
 	if [ "$status" = "on" ]
 	then
+		echo
 		echo "WARNING: vlan offload enabled in Rx path. Disable with:"
-		echo "         ethtool -K $dev rxvlan off"
+		echo "         ethtool -K ${dev} rxvlan off"
 	fi
 }
 
@@ -234,7 +235,6 @@ do_add()
 	local devidx
 	local mac
 	local vlan
-	local has_vlan="no"
 	local vm
 	local tmp
 
@@ -275,9 +275,6 @@ do_add()
 	then
 		echo "Invalid vlan"
 		return 1
-	elif [ ${vlan} -ne 0 ]
-	then
-		has_vlan="yes"
 	fi
 	# convert vlan to 4 digit hex
 	vlan=$(printf "%04x" ${vlan})
@@ -306,8 +303,6 @@ do_add()
 		echo "Failed to add entry to port map"
 		return 1
 	fi
-
-	[ ${has_vlan} = "yes" ] && check_offload
 
 	return 0
 }
@@ -430,6 +425,7 @@ do_status()
 {
 	local progid
 	local devs
+	local d
 
 	progid=$(get_prog_id ${PROG_NAME} 2>/dev/null)
 	if [ $? -ne 0 ]
@@ -441,7 +437,13 @@ do_status()
 	devs=$(ip -o li show | awk '$0 ~ "prog/xdp id '${progid}'"{printf "%s ", $2}')
 	if [ -n "${devs}" ]
 	then
+		devs="${devs//:/}"
 		echo "${PROG_NAME} is attached to ${devs//:/}"
+
+		for d in ${devs}
+		do
+			check_offload ${d}
+		done
 	else
 		echo "${PROG_NAME} is loaded but not attached to any devices"
 	fi
