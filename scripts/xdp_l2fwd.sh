@@ -398,7 +398,14 @@ do_delete()
 	fdbmap=$(get_map_id ${FDB_MAP_NAME})
 	exit_non_zero_rc $?
 
-	dev=$(${BPFTOOL} map lookup id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2} | sed 's/key.*value://')
+	dev=$(${BPFTOOL} map lookup id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2})
+	if [ $? -ne 0 ]
+	then
+		echo "Entry not found"
+		return 1
+	fi
+	dev=$(echo $dev | sed 's/key.*value://')
+
 	run_cmd ${BPFTOOL} map delete id ${devmap} key hex ${dev}
 	run_cmd ${BPFTOOL} map delete id ${fdbmap} key hex ${mac//:/ } ${vlan:2:2} ${vlan:0:2}
 }
