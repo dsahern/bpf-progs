@@ -262,7 +262,7 @@ do_add()
 	local fdbdev
 	local portdev
 	local devidx
-	local fdbidx="0"
+	local fdbidx
 	local mac
 	local vlan
 	local vm
@@ -291,6 +291,7 @@ do_add()
 		vlan=$2
 		mac=$3
 		dev=$4
+		fdbidx=$5
 		if [ -z "${vlan}" -o -z "${mac}" -o -z "${dev}" ]
 		then
 			echo "Invalid config file entry for ${vm}"
@@ -302,11 +303,14 @@ do_add()
 		exit 1
 	fi
 
+	[ -z "$fdbidx" ] && fdbidx="0"
+
 	if [ ${vlan} -gt 4095 ]
 	then
 		echo "Invalid vlan"
 		return 1
 	fi
+
 	# convert vlan to 4 digit hex
 	vlan=$(printf "%04x" ${vlan})
 
