@@ -319,6 +319,7 @@ static void dump_buckets(struct task *task, u64 *buckets)
 	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_4, PKTLAT_BUCKET_5, diff[5]);
 	printf("     %4u+  -   up:   %'8lu\n", PKTLAT_BUCKET_5, diff[6]);
 	printf("\n");
+	printf("     total packets:   %'8lu\n", npkts);
 	printf("           average:   %'8lu\n", diff[8] / npkts);
 	printf(" missing timestamp:   %'8lu\n", diff[7]);
 }
