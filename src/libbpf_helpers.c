@@ -6,7 +6,10 @@
  */
 
 #include <linux/if_link.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <limits.h>
+#include <unistd.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <errno.h>
@@ -18,8 +21,10 @@ int load_obj_file(struct bpf_prog_load_attr *attr,
 		  const char *objfile, bool user_set)
 {
 	static char *expected_paths[] = {
+		"bin",
 		"ksrc/obj",	/* path in git tree */
-		"./",		/* cwd */
+		"bpf-obj",
+		".",		/* cwd */
 		NULL,
 	};
 	char path[PATH_MAX];
@@ -32,15 +37,18 @@ int load_obj_file(struct bpf_prog_load_attr *attr,
 
 	attr->file = path;
 	while (expected_paths[i]) {
+		struct stat sbuf;
+
 		snprintf(path, sizeof(path), "%s/%s",
 			 expected_paths[i], objfile);
 
-		if (!bpf_prog_load_xattr(attr, obj, &prog_fd))
-			return 0;
+		if (stat(path, &sbuf) == 0) {
+			if (!bpf_prog_load_xattr(attr, obj, &prog_fd))
+				return 0;
 
-		if (errno != ENOENT)
-			break;
-
+			if (errno != ENOENT)
+				break;
+		}
 		++i;
 	}
 	return 1;
