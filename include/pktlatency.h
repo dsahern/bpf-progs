@@ -4,6 +4,18 @@
 
 #define MAX_CPUS	128
 
+#define PKTLAT_BUCKET_0    25
+#define PKTLAT_BUCKET_1    50
+#define PKTLAT_BUCKET_2    75
+#define PKTLAT_BUCKET_3   100
+#define PKTLAT_BUCKET_4   250
+#define PKTLAT_BUCKET_5   500
+/* bucket 6 is > 5
+ * bucket 7 is missing timestamps,
+ * bucket 8 is running sum
+ */
+#define PKTLAT_MAX_BUCKETS 9
+
 struct pktlat_ctl {
 	u64 ptp_ref;
 	u64 mono_ref;
@@ -17,17 +29,7 @@ struct pktlat_hist_key {
 };
 
 struct pktlat_hist_val {
-	/* 0:     0 -   15] - super fast
-	 * 1: (  15 -   50] - under load
-	 * 2: (  50 -  100]
-	 * 3: ( 100 -  200] - typical under light load
-	 * 4: ( 200 -  500] - should be rare
-	 * 5: ( 500 - 1000] - bad
-	 * 6: (1000 -  up ] - really bad
-	 * 7: missing timestamp
-	 */
-	u64 buckets[8];
-	u64 avg;    /* 5 second moving average TO-DO */
+	u64 buckets[PKTLAT_MAX_BUCKETS];
 };
 
 enum event_type {

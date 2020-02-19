@@ -57,23 +57,24 @@ static __always_inline int update_stats(struct pktlat_hist_val *hist,
 		hw_mono = ctl->mono_ref - (ctl->ptp_ref - tstamp);
 
 	t = bpf_ktime_get_ns();
-	dt = t - hw_mono;
+	dt = (t - hw_mono)/1000;
 
-	/* update hist entry */
-	if (dt > 1000000)
-		hist->buckets[6]++;
-	else if (dt > 500000)
-		hist->buckets[5]++;
-	else if (dt > 200000)
-		hist->buckets[4]++;
-	else if (dt > 100000)
-		hist->buckets[3]++;
-	else if (dt > 50000)
-		hist->buckets[2]++;
-	else if (dt > 15000)
-		hist->buckets[1]++;
-	else
+	if (dt <= PKTLAT_BUCKET_0)
 		hist->buckets[0]++;
+	else if (dt <= PKTLAT_BUCKET_1)
+		hist->buckets[1]++;
+	else if (dt <= PKTLAT_BUCKET_2)
+		hist->buckets[2]++;
+	else if (dt <= PKTLAT_BUCKET_3)
+		hist->buckets[3]++;
+	else if (dt <= PKTLAT_BUCKET_4)
+		hist->buckets[4]++;
+	else if (dt <= PKTLAT_BUCKET_5)
+		hist->buckets[5]++;
+	else
+		hist->buckets[6]++;
+
+	hist->buckets[8] += dt;
 
 	/* TO-DO: moving average */
 

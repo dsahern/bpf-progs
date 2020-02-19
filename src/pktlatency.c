@@ -33,12 +33,12 @@ struct task {
 	char comm[16];
 
 	/* previous histogram buckets */
-	u64 buckets[8];
+	u64 buckets[PKTLAT_MAX_BUCKETS];
 };
 
 static bool done;
 static u64 display_rate = 10 * NSEC_PER_SEC;
-static u64 latency_gen_sample = 200 * NSEC_PER_USEC;
+static u64 latency_gen_sample = 200;
 static pid_t disp_pid;
 
 static struct rb_root all_tasks;
@@ -168,10 +168,10 @@ static struct task *get_task(u32 pid, bool create)
 
 static void print_header(void)
 {
-	printf("\n%15s  %3s  %3s  %5s  %s\n",
-		"TIME    ", "CPU", "DEV", "LEN", "LATENCY");
-	printf("%15s  %3s  %3s  %5s  %s\n",
-		"", "", "", "", "(msec)");
+	printf("\n%15s  %3s  %5s  %3s  %5s  %s\n",
+		"TIME    ", "CPU", "PID", "DEV", "LEN", "LATENCY");
+	printf("%15s  %3s  %5s  %3s  %5s  %s\n",
+		"", "", "", "", "", "(msec)");
 }
 
 static u64 ptp_mono_ref, ptp_ref;
@@ -271,7 +271,6 @@ static void process_event(struct data *data)
 		       timestamp(buf, sizeof(buf), data->time), data->cpu,
 		       data->pid, data->ifindex, data->pkt_len);
 		hwtimestamp(data->tstamp, data->time);
-		printf("\n");
 
 		if (data->protocol) {
 			u32 len = data->pkt_len;
@@ -281,7 +280,6 @@ static void process_event(struct data *data)
 
 			print_pkt(data->protocol, data->pkt_data, len);
 		}
-		printf("\n");
 		break;
 	case EVENT_EXIT:
 		task = get_task(data->pid, false);
@@ -293,15 +291,13 @@ static void process_event(struct data *data)
 
 static void dump_buckets(struct task *task, u64 *buckets)
 {
-	u64 diff[8], sum = 0;
+	u64 diff[PKTLAT_MAX_BUCKETS], npkts = 0;
 	int i;
 
-	/* get difference between samples and save
-	 * new sample as old
-	 */
-	for (i = 0; i < 8; ++i) {
+	for (i = 0; i < PKTLAT_MAX_BUCKETS; ++i) {
 		diff[i] = buckets[i] - task->buckets[i];
-		sum += diff[i];
+		if (i < 7)
+			npkts += diff[i];
 
 		task->buckets[i] = buckets[i];
 	}
@@ -309,19 +305,22 @@ static void dump_buckets(struct task *task, u64 *buckets)
 	printf("\n%s[%u]", task->comm, task->pid);
 	printf(":\n");
 
-	if (sum == 0) {
+	if (npkts == 0) {
 		printf("No packets\n");
 		return;
 	}
 
-	printf("      0 -   15:  %lu\n", diff[0]);
-	printf("     16 -   50:  %lu\n", diff[1]);
-	printf("     51 -  100:  %lu\n", diff[2]);
-	printf("    101 -  200:  %lu\n", diff[3]);
-	printf("    201 -  500:  %lu\n", diff[4]);
-	printf("    501 - 1000:  %lu\n", diff[5]);
-	printf("   1001 -   up:  %lu\n", diff[6]);
-	printf("   missing timestamp:  %lu\n", diff[7]);
+	printf("      time (usec)        count\n");
+	printf("         0  - %4u:   %'8lu\n", PKTLAT_BUCKET_0, diff[0]);
+	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_0, PKTLAT_BUCKET_1, diff[1]);
+	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_1, PKTLAT_BUCKET_2, diff[2]);
+	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_2, PKTLAT_BUCKET_3, diff[3]);
+	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_3, PKTLAT_BUCKET_4, diff[4]);
+	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_4, PKTLAT_BUCKET_5, diff[5]);
+	printf("     %4u+  -   up:   %'8lu\n", PKTLAT_BUCKET_5, diff[6]);
+	printf("\n");
+	printf("           average:   %'8lu\n", diff[8] / npkts);
+	printf(" missing timestamp:   %'8lu\n", diff[7]);
 }
 
 static int hist_map_fd;
@@ -469,7 +468,7 @@ int main(int argc, char **argv)
 			display_rate = tmp * NSEC_PER_SEC;
 			break;
 		case 'l':
-			latency_gen_sample = atoi(optarg) * NSEC_PER_USEC;
+			latency_gen_sample = atoi(optarg);
 			break;
 		case 's':
 			gen_samples = true;
