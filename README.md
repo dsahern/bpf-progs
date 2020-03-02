@@ -48,6 +48,11 @@ support for packets pushed to a VM using XDP redirect.
 ### example
 sudo src/obj/pktlatency
 
+## ovslatency
+
+ovslatency measures the time to run ovs\_vport\_receive which is the primary
+workhorse for the OVS rx\_handler, netdev\_frame\_hook.
+
 ## execsnoop / opensnoop
 
 execsnoop and opensnoop are ebpf versions of what I previously would do using
@@ -58,3 +63,17 @@ attached to kprobes and tracepoints to get the same intent with ebpf.
 sudo src/obj/execsnoop
 sudo src/obj/opensnoop
 
+## XDP L2 forwarding
+
+xdp\_l2fwd handles Layer 2 forwarding between an ingress device (e.g., host
+devices) and egress device (e.g., tap device for VMs). Userspace populates
+an FDB (hash map) with \<vlan,dmac> pairs returning an index into a device
+map which contains the device to receive the packet. Lifecycle is managed by
+scripts/xdp\_l2fwd.sh.
+
+This program is used for the netdev 0x14 tutorial, XDP and the cloud: Using
+XDP on hosts and VMs https://netdevconf.info/0x14/session.html?tutorial-XDP-and-the-cloud
+
+## Dummy XDP program
+
+xdp\_dummy is a dummy XDP program that just returns XDP\_PASS.
