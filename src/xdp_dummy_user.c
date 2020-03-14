@@ -32,10 +32,9 @@ int main(int argc, char **argv)
 {
 	int (*attach_fn)(int idx, int prog_fd, const char *dev) = attach_to_dev;
 	int (*detach_fn)(int idx, const char *dev) = detach_from_dev;
-	struct bpf_prog_load_attr prog_load_attr = {
-		.prog_type	= BPF_PROG_TYPE_XDP,
-	};
+	struct bpf_prog_load_attr prog_load_attr = { };
 	const char *objfile = "xdp_dummy_kern.o";
+	const char *pname = "xdp_dummy";
 	bool filename_set = false;
 	struct bpf_program *prog;
 	struct bpf_object *obj;
@@ -89,7 +88,7 @@ int main(int argc, char **argv)
 	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
                 return 1;
 
-	prog = bpf_object__find_program_by_title(obj, "xdp_dummy");
+	prog = bpf_object__find_program_by_title(obj, pname);
 	prog_fd = bpf_program__fd(prog);
 	if (prog_fd < 0) {
 		printf("program not found: %s\n", strerror(prog_fd));
