@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 				idx = strtoul(argv[i], NULL, 0);
 
 			if (!idx) {
-				fprintf(stderr, "Invalid arg\n");
+				fprintf(stderr, "Invalid device argument\n");
 				return 1;
 			}
 			err = detach_fn(idx, argv[i]);
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 			idx = strtoul(argv[i], NULL, 0);
 
 		if (!idx) {
-			fprintf(stderr, "Invalid arg\n");
+			fprintf(stderr, "Invalid device argument\n");
 			return 1;
 		}
 
