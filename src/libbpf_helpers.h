@@ -8,6 +8,9 @@ int load_obj_file(struct bpf_prog_load_attr *attr,
                   struct bpf_object **obj,
                   const char *objfile, bool user_set);
 
+int attach_to_dev_generic(int idx, int prog_fd, const char *dev);
+int detach_from_dev_generic(int idx, const char *dev);
+
 int attach_to_dev(int idx, int prog_fd, const char *dev);
 int detach_from_dev(int idx, const char *dev);
 

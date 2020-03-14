@@ -54,6 +54,31 @@ int load_obj_file(struct bpf_prog_load_attr *attr,
 	return 1;
 }
 
+int attach_to_dev_generic(int idx, int prog_fd, const char *dev)
+{
+	int err;
+
+	err = bpf_set_link_xdp_fd(idx, prog_fd, XDP_FLAGS_SKB_MODE);
+	if (err < 0) {
+		printf("ERROR: failed to attach program to %s\n", dev);
+		return err;
+	}
+
+	return 0;
+}
+
+int detach_from_dev_generic(int idx, const char *dev)
+{
+	int err;
+
+	err = bpf_set_link_xdp_fd(idx, -1, XDP_FLAGS_SKB_MODE);
+	if (err < 0)
+		printf("ERROR: failed to detach program from %s\n", dev);
+
+	return 0;
+}
+
+
 int attach_to_dev(int idx, int prog_fd, const char *dev)
 {
 	int err;
