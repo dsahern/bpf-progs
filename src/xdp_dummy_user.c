@@ -22,13 +22,16 @@ static void usage(const char *prog)
 	fprintf(stderr,
 		"usage: %s [OPTS] interface-list\n"
 		"\nOPTS:\n"
+		"    -d            detach program\n"
 		"    -f bpf-file   bpf filename to load\n"
-		"    -d            detach program\n",
-		prog);
+		"    -g            skb mode\n"
+		, prog);
 }
 
 int main(int argc, char **argv)
 {
+	int (*attach_fn)(int idx, int prog_fd, const char *dev) = attach_to_dev;
+	int (*detach_fn)(int idx, const char *dev) = detach_from_dev;
 	struct bpf_prog_load_attr prog_load_attr = {
 		.prog_type	= BPF_PROG_TYPE_XDP,
 	};
@@ -40,7 +43,7 @@ int main(int argc, char **argv)
 	bool attach = true;
 	int ret = 0;
 
-	while ((opt = getopt(argc, argv, ":df:")) != -1) {
+	while ((opt = getopt(argc, argv, ":df:g")) != -1) {
 		switch (opt) {
 		case 'f':
 			objfile = optarg;
@@ -48,6 +51,10 @@ int main(int argc, char **argv)
 			break;
 		case 'd':
 			attach = false;
+			break;
+		case 'g':
+			attach_fn = attach_to_dev_generic;
+			detach_fn = detach_from_dev_generic;
 			break;
 		default:
 			usage(basename(argv[0]));
@@ -83,11 +90,11 @@ int main(int argc, char **argv)
 			return 1;
 		}
 		if (!attach) {
-			err = detach_from_dev(idx, argv[i]);
+			err = detach_fn(idx, argv[i]);
 			if (err)
 				ret = err;
 		} else {
-			err = attach_to_dev(idx, prog_fd, argv[i]);
+			err = attach_fn(idx, prog_fd, argv[i]);
 			if (err)
 				ret = err;
 		}
