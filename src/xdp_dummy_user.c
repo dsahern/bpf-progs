@@ -67,8 +67,26 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (attach &&
-	    load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (!attach) {
+		for (i = optind; i < argc; ++i) {
+			int idx, err;
+
+			idx = if_nametoindex(argv[i]);
+			if (!idx)
+				idx = strtoul(argv[i], NULL, 0);
+
+			if (!idx) {
+				fprintf(stderr, "Invalid arg\n");
+				return 1;
+			}
+			err = detach_fn(idx, argv[i]);
+			if (err)
+				ret = err;
+		}
+		return ret;
+	}
+
+	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
                 return 1;
 
 	prog = bpf_object__find_program_by_title(obj, "xdp_dummy");
@@ -89,15 +107,10 @@ int main(int argc, char **argv)
 			fprintf(stderr, "Invalid arg\n");
 			return 1;
 		}
-		if (!attach) {
-			err = detach_fn(idx, argv[i]);
-			if (err)
-				ret = err;
-		} else {
-			err = attach_fn(idx, prog_fd, argv[i]);
-			if (err)
-				ret = err;
-		}
+
+		err = attach_fn(idx, prog_fd, argv[i]);
+		if (err)
+			ret = err;
 	}
 
 	return ret;
