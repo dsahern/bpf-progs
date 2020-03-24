@@ -66,6 +66,21 @@ struct ksym_s *find_ksym(unsigned long addr)
 	return NULL;
 }
 
+struct ksym_s *find_ksym_by_name(const char *name)
+{
+	struct rb_node *node;
+
+	for (node = rb_first(&ksyms); node; node = rb_next(node)) {
+		struct ksym_s *sym;
+
+		sym = rb_entry(node, struct ksym_s, rb_node);
+		if (!strcmp(sym->name, name))
+			return sym;
+	}
+
+	return NULL;
+}
+
 /* look for sym with this starting address */
 static struct ksym_s *find_ksym_start(unsigned long addr)
 {

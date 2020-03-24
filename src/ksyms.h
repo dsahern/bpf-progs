@@ -20,6 +20,7 @@ struct ksym_s {
 
 int load_ksyms(const char *file);
 struct ksym_s *find_ksym(unsigned long addr);
+struct ksym_s *find_ksym_by_name(const char *name);
 struct ksym_s *new_ksym(unsigned long addr, const char *name, const char *mod);
 int insert_ksym(struct ksym_s *new_sym);
 void free_ksym(struct ksym_s *sym);
