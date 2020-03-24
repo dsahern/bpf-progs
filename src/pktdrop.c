@@ -48,6 +48,7 @@ enum {
 	HIST_BY_SMAC,
 	HIST_BY_DIP,
 	HIST_BY_SIP,
+	HIST_BY_FLOW,
 };
 
 enum {
@@ -68,6 +69,22 @@ enum {
 	HIST_MAX,
 };
 
+struct flow_entry {
+	struct list_head list;
+	unsigned int	hits;
+	u8		aging;
+	struct flow	flow;
+};
+
+#define MAX_FLOW_ENTRIES  25
+struct flow_buckets {
+	struct list_head flows;
+
+	u8		flow_count;
+	bool		overflow;
+	bool		failures;
+};
+
 struct drop_hist {
 	struct rb_node rb_node;
 	union {
@@ -78,7 +95,10 @@ struct drop_hist {
 	unsigned int	total_drops;
 	u8		aging;
 	bool		dead;
-	unsigned int	buckets[HIST_MAX];
+	union {
+		unsigned int		buckets[HIST_MAX];
+		struct flow_buckets	flb;
+	};
 };
 
 struct drop_loc {
@@ -154,6 +174,8 @@ static struct drop_hist *new_droph(unsigned long addr)
 		}
 		if (debug)
 			printf("%s %lx\n", droph->name, addr);
+	} else if (do_hist == HIST_BY_FLOW) {
+		INIT_LIST_HEAD(&droph->flb.flows);
 	} else if (debug) {
 		print_mac((u8 *)&addr, true);
 		printf("\n");
@@ -167,6 +189,17 @@ static void remove_droph(struct drop_hist *droph)
 	struct rb_root *rb_root = &all_drop_hists;
 
 	rb_erase(&droph->rb_node, rb_root);
+
+	if (do_hist == HIST_BY_FLOW) {
+		struct flow_buckets *flb = &droph->flb;
+		struct flow_entry *fl_entry, *fl_next;
+
+		list_for_each_entry_safe(fl_entry, fl_next, &flb->flows, list) {
+			list_del(&fl_entry->list);
+			free(fl_entry);
+		}
+	}
+
 	free(droph);
 }
 
@@ -341,7 +374,54 @@ restart:
 	}
 }
 
-static void show_hist_entries(void)
+static void show_flow_buckets(void)
+{
+	struct rb_root *rb_root = &all_drop_hists;
+	struct drop_hist *droph;
+	struct rb_node *node;
+
+	for (node = rb_first(rb_root); node; node = rb_next(node)) {
+		struct flow_entry *fl_entry, *fl_next;
+		struct flow_buckets *flb;
+		bool show_buckets;
+
+		droph = container_of(node, struct drop_hist, rb_node);
+		flb = &droph->flb;
+
+		show_buckets = (droph->total_drops >= drop_thresh);
+		list_for_each_entry_safe(fl_entry, fl_next, &flb->flows, list) {
+			if (show_buckets && fl_entry->hits) {
+				printf("    hits %4u:   ", fl_entry->hits);
+				print_flow(&fl_entry->flow);
+			}
+
+			if (fl_entry->hits) {
+				fl_entry->aging = 3;
+			} else if (--fl_entry->aging == 0) {
+				list_del(&fl_entry->list);
+				free(fl_entry);
+			}
+
+			fl_entry->hits = 0;
+		}
+		if (flb->overflow)
+			printf("too many flow entries for bucket\n");
+		if (flb->failures)
+			printf("failures processing entry\n");
+
+		if (show_buckets)
+			printf("\n");
+
+		if (droph->total_drops)
+			droph->aging = 3;
+		else if (--droph->aging == 0)
+			droph->dead = true;
+
+		droph->total_drops = 0;
+	}
+}
+
+static void show_hist_buckets(void)
 {
 	struct rb_root *rb_root = &all_drop_hists;
 	struct drop_hist *droph;
@@ -386,6 +466,13 @@ do_aging:
 
 		droph->total_drops = 0;
 	}
+}
+
+static void cleanup_hist_buckets(void)
+{
+	struct rb_root *rb_root = &all_drop_hists;
+	struct drop_hist *droph;
+	struct rb_node *node;
 
 	/* remove dead entries - must be a better way to do this */
 restart:
@@ -417,17 +504,23 @@ static void show_hist(void)
 	case HIST_BY_SIP:
 		printf("    %17s", "");
 		break;
+	case HIST_BY_FLOW:
+		break;
 	default:
 		printf("    %10s", "");
 	}
 
-	for (i = 0; i < HIST_MAX; i++) {
-		if (!hist_desc[i].skip)
-			printf("  %10s", hist_desc[i].str);
-	}
-	printf("  %10s\n", "total");
+	if (do_hist == HIST_BY_FLOW) {
+		show_flow_buckets();
+	} else {
+		for (i = 0; i < HIST_MAX; i++) {
+			if (!hist_desc[i].skip)
+				printf("  %10s", hist_desc[i].str);
+		}
+		printf("  %10s\n", "total");
 
-	show_hist_entries();
+		show_hist_buckets();
+	}
 
 	printf("\n  drops by packet type: ");
 	for (i = 0; i <= PKT_TYPE_MAX; ++i) {
@@ -437,6 +530,8 @@ static void show_hist(void)
 	printf("\n");
 
 	show_loc_entries();
+
+	cleanup_hist_buckets();
 }
 
 static void process_tcp(unsigned int *buckets, const struct flow_tcp *flt)
@@ -495,6 +590,34 @@ static void process_arp(unsigned int *buckets, const struct flow_arp *fla)
 	}
 }
 
+static void process_flow(struct flow_buckets *flb, struct flow *flow)
+{
+	struct flow_entry *fl_entry;
+	bool found = false;
+
+	list_for_each_entry(fl_entry, &flb->flows, list) {
+		if (!memcmp(&fl_entry->flow, flow, sizeof(*flow))) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		if (flb->flow_count > MAX_FLOW_ENTRIES) {
+			flb->overflow = true;
+			return;
+		}
+		fl_entry = calloc(1, sizeof(*fl_entry));
+		if (!fl_entry) {
+			flb->failures = true;
+			return;
+		}
+		memcpy(&fl_entry->flow, flow, sizeof(*flow));
+		list_add(&fl_entry->list, &flb->flows);
+	}
+	fl_entry->hits++;
+}
+
 static void process_exit(struct data *data)
 {
 	struct drop_hist *droph;
@@ -539,6 +662,7 @@ static void process_packet(struct data *data, struct ksym_s *sym)
 	case HIST_BY_NETNS:
 		addr = data->netns;
 		break;
+	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
 	case HIST_BY_DMAC:
 		for (i = 0; i < 6; ++i)
 			p[i] = fl.dmac[5-i];
@@ -568,6 +692,11 @@ static void process_packet(struct data *data, struct ksym_s *sym)
 	}
 
 	droph->total_drops++;
+
+	if (do_hist == HIST_BY_FLOW) {
+		process_flow(&droph->flb, &fl);
+		return;
+	}
 
 	switch(fl.proto) {
 	case ETH_P_ARP:
@@ -716,7 +845,7 @@ static void print_usage(char *prog)
 	"	-m count       set number of pages in perf buffers\n"
 	"	-O             ignore ovs upcalls\n"
 	"	-r rate        display rate (seconds) to dump summary\n"
-	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip)\n"
+	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip, flow)\n"
 	"	-t num         only display entries with drops more than num\n"
 	"	-U             ignore unix drops\n"
 	, basename(prog));
@@ -788,6 +917,9 @@ int main(int argc, char **argv)
 			} else if (strcmp(optarg, "sip") == 0) {
 				hist_sort = "source ip";
 				do_hist = HIST_BY_SIP;
+			} else if (strcmp(optarg, "flow") == 0) {
+				hist_sort = "dmac and flow";
+				do_hist = HIST_BY_FLOW;
 			} else {
 				fprintf(stderr, "Invalid sort option\n");
 				return 1;
