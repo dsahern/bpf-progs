@@ -16,6 +16,8 @@ struct ksym_s {
 	unsigned long addr_next;
 	char *name;
 	char *mod;
+
+	bool is_unix;
 };
 
 int load_ksyms(const char *file);

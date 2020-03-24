@@ -20,10 +20,12 @@ struct ksym_s *new_ksym(unsigned long addr, const char *name, const char *mod)
 {
 	struct ksym_s *sym = calloc(1, sizeof(struct ksym_s));
 
-	if(sym) {
+	if (sym) {
 		sym->addr = addr;
 		sym->name = strdup(name);
 		sym->mod = strdup(mod);
+		if (!strncmp(name, "unix", 4))
+			sym->is_unix = true;
 	}
 
 	return sym;
