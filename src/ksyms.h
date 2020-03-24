@@ -14,8 +14,8 @@ struct ksym_s {
 
 	unsigned long addr;
 	unsigned long addr_next;
-	char name[64];
-	char mod[32];
+	char *name;
+	char *mod;
 };
 
 int load_ksyms(const char *file);

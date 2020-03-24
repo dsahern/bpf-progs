@@ -22,8 +22,8 @@ struct ksym_s *new_ksym(unsigned long addr, const char *name, const char *mod)
 
 	if(sym) {
 		sym->addr = addr;
-		strncpy(sym->name, name, sizeof(sym->name)-1);
-		strncpy(sym->mod, mod, sizeof(sym->mod)-1);
+		sym->name = strdup(name);
+		sym->mod = strdup(mod);
 	}
 
 	return sym;
@@ -31,6 +31,8 @@ struct ksym_s *new_ksym(unsigned long addr, const char *name, const char *mod)
 
 void free_ksym(struct ksym_s *sym)
 {
+	free(sym->name);
+	free(sym->mod);
 	free(sym);
 }
 
