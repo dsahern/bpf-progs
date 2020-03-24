@@ -505,21 +505,16 @@ static void process_exit(struct data *data)
 	}
 }
 
-static void process_packet(struct data *data)
+static void process_packet(struct data *data, struct ksym_s *sym)
 {
 	struct drop_hist *droph;
 	struct drop_loc *dropl;
 	unsigned long addr = 0;
 	u8 *p = (u8 *)&addr, i;
 	struct flow fl = {};
-	struct ksym_s *sym;
 
 	total_drops++;
 	total_drops_by_type[data->pkt_type & PKT_TYPE_MAX]++;
-
-	sym = find_ksym(data->location);
-	if (skip_ovs_upcalls && sym == ovs_sym)
-		return;
 
 	dropl = find_dropl(data->location, sym ? sym->name : NULL);
 	if (dropl)
@@ -614,10 +609,10 @@ static struct ksym_s *find_ksym_droph(unsigned long addr)
 	return sym;
 }
 
-static void show_packet(struct data *data)
+static void show_packet(struct data *data, struct ksym_s *sym)
 {
 	u8 pkt_type = data->pkt_type & PKT_TYPE_MAX;
-	struct ksym_s *sym;
+	struct ksym_s *symns;
 	bool is_unix;
 	char buf[64];
 	u32 len;
@@ -627,18 +622,14 @@ static void show_packet(struct data *data)
 
 	printf("%12s  ", drop_by_type_str[pkt_type]);
 
-	sym = find_ksym_droph(data->netns);
-	if (sym)
-		printf("%10s", sym->name);
+	symns = find_ksym_droph(data->netns);
+	if (symns)
+		printf("%10s", symns->name);
 	else
 		printf("%lx", data->netns);
 
 	printf("  %3u  %3u  %3u  ",
 		data->pkt_len, data->nr_frags, data->gso_size);
-
-	sym = find_ksym(data->location);
-	if (skip_ovs_upcalls && sym == ovs_sym)
-		return;
 
 	if (sym) {
 		u64 offset = data->location - sym->addr;
@@ -673,12 +664,18 @@ static void show_packet(struct data *data)
 
 static void process_event(struct data *data)
 {
+	struct ksym_s *sym;
+
 	switch (data->event_type) {
 	case EVENT_SAMPLE:
+		sym = find_ksym(data->location);
+		if (skip_ovs_upcalls && sym == ovs_sym)
+			return;
+
 		if (do_hist)
-			process_packet(data);
+			process_packet(data, sym);
 		else
-			show_packet(data);
+			show_packet(data, sym);
 		break;
 	case EVENT_EXIT:
 		process_exit(data);
