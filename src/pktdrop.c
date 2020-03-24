@@ -37,6 +37,7 @@ static const char *hist_sort;
 static unsigned int nsid;
 static struct ksym_s *ovs_sym;
 static bool skip_ovs_upcalls;
+static bool skip_unix;
 static bool done;
 static bool debug;
 
@@ -520,7 +521,7 @@ static void process_packet(struct data *data, struct ksym_s *sym)
 	if (dropl)
 		dropl->total_drops++;
 
-	if (sym && strstr(sym->name, "unix")) {
+	if (sym && sym->is_unix) {
 		total_drops_unix++;
 		return;
 	}
@@ -636,8 +637,7 @@ static void show_packet(struct data *data, struct ksym_s *sym)
 
 		printf("%s+0x%lx (%lx)\n",
 		       sym->name, offset, data->location);
-
-		is_unix = strstr(sym->name, "unix") != NULL;
+		is_unix = sym->is_unix;
 	} else {
 		printf("%lx\n", data->location);
 		is_unix = false;
@@ -670,6 +670,8 @@ static void process_event(struct data *data)
 	case EVENT_SAMPLE:
 		sym = find_ksym(data->location);
 		if (skip_ovs_upcalls && sym == ovs_sym)
+			return;
+		if (skip_unix && sym->is_unix)
 			return;
 
 		if (do_hist)
@@ -712,10 +714,11 @@ static void print_usage(char *prog)
 	"	-i             ignore kprobe error (4.14 can not install kprobe on fib_net_exit)\n"
 	"	-k kallsyms    load kernel symbols from this file\n"
 	"	-m count       set number of pages in perf buffers\n"
-	"	-o             ignore ovs upcalls\n"
+	"	-O             ignore ovs upcalls\n"
 	"	-r rate        display rate (seconds) to dump summary\n"
 	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip)\n"
 	"	-t num         only display entries with drops more than num\n"
+	"	-U             ignore unix drops\n"
 	, basename(prog));
 }
 
@@ -739,7 +742,7 @@ int main(int argc, char **argv)
 	int pg_cnt = 0;
 	int rc, r;
 
-	while ((rc = getopt(argc, argv, "f:ik:m:or:s:t:")) != -1)
+	while ((rc = getopt(argc, argv, "f:ik:m:Or:s:t:U")) != -1)
 	{
 		switch(rc) {
 		case 'f':
@@ -758,7 +761,7 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			break;
-		case 'o':
+		case 'O':
 			skip_ovs_upcalls = true;
 			break;
 		case 'r':
@@ -797,6 +800,9 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			drop_thresh = r;
+			break;
+		case 'U':
+			skip_unix = true;
 			break;
 		default:
 			print_usage(argv[0]);
