@@ -20,7 +20,7 @@
 static void print_tcp(const struct flow_tcp *fl, const char *src,
 		      const char *dst)
 {
-	printf("    TCP: src=%s/%d -> dst=%s/%d",
+	printf("  src=%s/%d -> dst=%s/%d TCP",
 		src, fl->sport, dst, fl->dport);
 
 	if (fl->syn)
@@ -40,7 +40,7 @@ static void print_tcp(const struct flow_tcp *fl, const char *src,
 static void print_udp(const struct flow_udp *fl, const char *src,
 		      const char *dst)
 {
-	printf("    UDP: src=%s/%d -> dst=%s/%d\n",
+	printf("  src=%s/%d -> dst=%s/%d UDP\n",
 		src, fl->sport, dst, fl->dport);
 }
 
