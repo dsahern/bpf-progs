@@ -436,27 +436,23 @@ static void show_hist(void)
 	show_loc_entries();
 }
 
-static void process_tcp(unsigned int *buckets, const struct tcphdr *tcph)
+static void process_tcp(unsigned int *buckets, const struct flow_tcp *flt)
 {
-	if (tcph->fin)
+	if (flt->fin)
 		buckets[HIST_TCP_FIN]++;
-	else if (tcph->rst)
+	else if (flt->rst)
 		buckets[HIST_TCP_RST]++;
-	else if (tcph->syn)
+	else if (flt->syn)
 		buckets[HIST_TCP_SYN]++;
 }
 
-static void process_transport(unsigned int *buckets, u8 protocol,
-			      const u8 *data, unsigned int len,
-			      unsigned int hlen)
+static void process_transport(unsigned int *buckets,
+			      const struct flow_transport *flt)
 {
-	switch(protocol) {
+	switch(flt->proto) {
 	case IPPROTO_TCP:
 		buckets[HIST_TCP]++;
-		if (len < hlen + sizeof(struct tcphdr))
-			return;
-
-		process_tcp(buckets, (struct tcphdr *)(data + hlen));
+		process_tcp(buckets, &flt->tcp);
 		break;
 	case IPPROTO_UDP:
 		buckets[HIST_UDP]++;
@@ -467,45 +463,23 @@ static void process_transport(unsigned int *buckets, u8 protocol,
 	}
 }
 
-static void process_ipv6(unsigned int *buckets, const u8 *data, u32 len)
+static void process_ipv6(unsigned int *buckets, const struct flow_ip6 *fl6)
 {
-	const struct ipv6hdr *ip6h = (const struct ipv6hdr *)data;
-
 	buckets[HIST_IPV6]++;
-
-	if (len < sizeof(struct ipv6hdr))
-		return;
-
-	process_transport(buckets, ip6h->nexthdr, data, len, sizeof(*ip6h));
+	process_transport(buckets, &fl6->trans);
 }
 
-static void process_ipv4(unsigned int *buckets, const u8 *data, u32 len)
+static void process_ipv4(unsigned int *buckets, const struct flow_ip4 *fl4)
 {
-	const struct iphdr *iph = (const struct iphdr *)data;
-	unsigned int hlen;
-
 	buckets[HIST_IPV4]++;
-
-	if (len < sizeof(*iph))
-		return;
-
-	if (iph->version != 4)
-		return;
-
-	hlen = iph->ihl << 2;
-	process_transport(buckets, iph->protocol, data, len, hlen);
+	process_transport(buckets, &fl4->trans);
 }
 
-static void process_arp(unsigned int *buckets, const u8 *data, u32 len)
+static void process_arp(unsigned int *buckets, const struct flow_arp *fla)
 {
-	const struct arphdr *arph = (const struct arphdr *)data;
-
 	buckets[HIST_ARP]++;
 
-	if (len < sizeof(*arph))
-		return;
-
-	switch(ntohs(arph->ar_op)) {
+	switch(fla->op) {
 	case ARPOP_REQUEST:
 		buckets[HIST_ARP_REQ]++;
 		break;
@@ -531,21 +505,15 @@ static void process_exit(struct data *data)
 
 static void process_packet(struct data *data)
 {
-	u8 pkt_type = data->pkt_type & PKT_TYPE_MAX;
-	u8 *pkt_data = data->pkt_data;
-	const struct ethhdr *eth = (const struct ethhdr *)pkt_data;
-	unsigned int hlen = sizeof(*eth);
-	const struct iphdr *iph;
 	struct drop_hist *droph;
-	unsigned long addr = 0;
-	u32 len = data->pkt_len;
-	u8 *p = (u8 *)&addr, i;
 	struct drop_loc *dropl;
+	unsigned long addr = 0;
+	u8 *p = (u8 *)&addr, i;
+	struct flow fl = {};
 	struct ksym_s *sym;
-	u16 proto;
 
 	total_drops++;
-	total_drops_by_type[pkt_type]++;
+	total_drops_by_type[data->pkt_type & PKT_TYPE_MAX]++;
 
 	sym = find_ksym(data->location);
 
@@ -558,16 +526,14 @@ static void process_packet(struct data *data)
 		return;
 	}
 
-	proto = ntohs(eth->h_proto);
-	if (proto == ETH_P_8021Q) {
-		struct vlan_hdr *vhdr = (struct vlan_hdr *)(pkt_data + hlen);
-
-		hlen += sizeof(*vhdr);
-		proto = ntohs(vhdr->h_vlan_encapsulated_proto);
+	if (data->vlan_tci) {
+		fl.has_vlan = true;
+		fl.vlan.outer_vlan_TCI = data->vlan_tci;
 	}
-
-	pkt_data += hlen;
-	len -= hlen;
+	if (parse_pkt(&fl, data->protocol, data->pkt_data, data->pkt_len)) {
+		fprintf(stderr, "Failed to parse packet\n");
+		return;
+	}
 
 	switch(do_hist) {
 	case HIST_BY_NETNS:
@@ -575,23 +541,20 @@ static void process_packet(struct data *data)
 		break;
 	case HIST_BY_DMAC:
 		for (i = 0; i < 6; ++i)
-			p[i] = eth->h_dest[5-i];
+			p[i] = fl.dmac[5-i];
 		break;
 	case HIST_BY_SMAC:
 		for (i = 0; i < 6; ++i)
-			p[i] = eth->h_source[5-i];
+			p[i] = fl.smac[5-i];
 		break;
 	case HIST_BY_DIP:
 	case HIST_BY_SIP:
-		if (proto != ETH_P_IP)
+		if (fl.proto != ETH_P_IP)
 			return;
-		if (len < sizeof(*iph))
-			return;
-		iph = (const struct iphdr *)pkt_data;
 		if (do_hist == HIST_BY_DIP)
-			memcpy(&addr, &iph->daddr, 4);
+			memcpy(&addr, &fl.ip4.daddr, 4);
 		else
-			memcpy(&addr, &iph->saddr, 4);
+			memcpy(&addr, &fl.ip4.saddr, 4);
 		break;
 	default:
 		return;
@@ -606,15 +569,15 @@ static void process_packet(struct data *data)
 
 	droph->total_drops++;
 
-	switch(proto) {
+	switch(fl.proto) {
 	case ETH_P_ARP:
-		process_arp(droph->buckets, pkt_data, len);
+		process_arp(droph->buckets, &fl.arp);
 		break;
         case ETH_P_IP:
-		process_ipv4(droph->buckets, pkt_data, len);
+		process_ipv4(droph->buckets, &fl.ip4);
 		break;
         case ETH_P_IPV6:
-		process_ipv6(droph->buckets, pkt_data, len);
+		process_ipv6(droph->buckets, &fl.ip6);
 		break;
         case ETH_P_LLDP:
 		droph->buckets[HIST_LLDP]++;
