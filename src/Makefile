@@ -32,6 +32,7 @@ COMMON += $(OBJDIR)timestamps.o
 COMMON += $(OBJDIR)libbpf_helpers.o
 COMMON += $(OBJDIR)str_utils.o
 COMMON += $(OBJDIR)rbtree.o
+COMMON += $(OBJDIR)parse_pkt.o
 COMMON += $(OBJDIR)print_pkt.o
 COMMON += $(OBJDIR)ksyms.o
 

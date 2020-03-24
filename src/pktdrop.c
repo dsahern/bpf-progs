@@ -20,10 +20,10 @@
 #include <bpf/bpf.h>
 
 #include "pktdrop.h"
+#include "flow.h"
 #include "libbpf_helpers.h"
 #include "ksyms.h"
 #include "perf_events.h"
-#include "print_pkt.h"
 #include "str_utils.h"
 #include "timestamps.h"
 
@@ -686,9 +686,14 @@ static void show_packet(struct data *data)
 	if (len > sizeof(data->pkt_data))
 		len = sizeof(data->pkt_data);
 
-	if (data->protocol || !is_unix)
-		print_pkt(data->protocol, data->pkt_data, len);
+	if (data->protocol || !is_unix) {
+		struct flow fl = {};
 
+		if (parse_pkt(&fl, data->protocol, data->pkt_data, len))
+			printf("*** failed to parse ***\n");
+		else
+			print_flow(&fl);
+	}
 	printf("\n");
 }
 

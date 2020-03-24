@@ -148,7 +148,7 @@ int parsestr(char *str, char *delims, char *fields[], int nmax)
 	return n;
 }
 
-void print_mac(__u8 *mac, bool reverse)
+void print_mac(const __u8 *mac, bool reverse)
 {
 	if (reverse)
 		printf("%.02x:%.02x:%.02x:%.02x:%.02x:%.02x",

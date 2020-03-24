@@ -19,9 +19,9 @@
 #include <bpf/bpf.h>
 
 #include "pktlatency.h"
+#include "flow.h"
 #include "libbpf_helpers.h"
 #include "perf_events.h"
-#include "print_pkt.h"
 #include "timestamps.h"
 
 #include "perf_events.c"

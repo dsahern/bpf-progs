@@ -11,5 +11,5 @@ int str_to_mac(const char *str, unsigned char *mac);
 int get_ifidx(const char *arg);
 
 int parsestr(char *str, char *delims, char *fields[], int nmax);
-void print_mac(__u8 *mac, bool reverse);
+void print_mac(const __u8 *mac, bool reverse);
 #endif

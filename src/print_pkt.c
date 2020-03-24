@@ -14,252 +14,155 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "print_pkt.h"
+#include "flow.h"
 #include "str_utils.h"
 
-static void dump_data(const __u8 *data, __u32 len)
-{
-	char buf[256], bytes[10];
-	int i, j;
-
-	if (len & (len - 1))
-		len--;
-
-	buf[0] = 0;
-	for (i = 0, j = 0; i < len; i+=2, ++j) {
-		sprintf(bytes ,"%2.2x%2.2x ", data[i], data[i+1]);
-		strcat(buf, bytes);
-		if (j == 7) {
-			j = -1;
-			printf("%s  ", buf);
-			buf[0] = 0;
-		}
-	}
-	if (buf[0])
-		printf("%s", buf);
-
-	printf("\n");
-}
-
-static void print_tcp(const struct tcphdr *tcph, const char *src,
+static void print_tcp(const struct flow_tcp *fl, const char *src,
 		      const char *dst)
 {
 	printf("    TCP: src=%s/%d -> dst=%s/%d",
-		src, ntohs(tcph->source),
-		dst, ntohs(tcph->dest));
+		src, fl->sport, dst, fl->dport);
 
-	if (tcph->syn)
+	if (fl->syn)
 		printf(" SYN");
-	if (tcph->ack)
+	if (fl->ack)
 		printf(" ACK");
-	if (tcph->psh)
+	if (fl->psh)
 		printf(" PSH");
-	if (tcph->fin)
+	if (fl->fin)
 		printf(" FIN");
-	if (tcph->rst)
+	if (fl->rst)
 		printf(" RST");
 
 	printf("\n");
 }
 
-static void print_udp(const struct udphdr *udph, const char *src,
+static void print_udp(const struct flow_udp *fl, const char *src,
 		      const char *dst)
 {
 	printf("    UDP: src=%s/%d -> dst=%s/%d\n",
-		src, ntohs(udph->source),
-		dst, ntohs(udph->dest));
+		src, fl->sport, dst, fl->dport);
 }
 
-static void print_ipv6(const __u8 *data, __u32 len)
+static void print_transport(const struct flow_transport *fl,
+			    const char *src, const char *dst)
 {
-	const struct ipv6hdr *ip6h = (const struct ipv6hdr *)data;
-	char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
-	const struct udphdr *udph;
-	const struct tcphdr *tcph;
-	unsigned int hlen;
-
-	if (len < sizeof(struct ipv6hdr)) {
-		printf("    packet snippet too small for ipv6 header\n");
-		dump_data(data, len);
-		return;
-	}
-
-	inet_ntop(AF_INET6, &ip6h->saddr, src, sizeof(src));
-	inet_ntop(AF_INET6, &ip6h->daddr, dst, sizeof(dst));
-
-	hlen = sizeof(*ip6h);
-	switch(ip6h->nexthdr) {
+	switch(fl->proto) {
 	case IPPROTO_TCP:
-		if (len < hlen + sizeof(*tcph)) {
-			printf("    ipv6 packet snippet too small for tcp ports\n");
-			return;
-		}
-		tcph = (struct tcphdr *)(data + hlen);
-		print_tcp(tcph, src, dst);
+		print_tcp(&fl->tcp, src, dst);
 		break;
 	case IPPROTO_UDP:
-		if (len < hlen + sizeof(*udph)) {
-			printf("    ipv6 packet snippet too small for udp ports\n");
-			return;
-		}
-		udph = (struct udphdr *)(data + hlen);
-		print_udp(udph, src, dst);
+		print_udp(&fl->udp, src, dst);
 		break;
 	case IPPROTO_VRRP:
-		printf("    VRRP: src=%s -> dst=%s\n",
-			src, dst);
+		printf("    VRRP: src=%s -> dst=%s\n", src, dst);
 		break;
 	default:
 		printf("    protocol %u: src=%s -> dst=%s\n",
-			ip6h->nexthdr, src, dst);
-		//dump_data(data, len);
+			fl->proto, src, dst);
 	}
-
-	return;
 }
 
-static void print_arphdr(const struct arphdr *arph, __u32 len)
+static void print_ipv6(const struct flow_ip6 *fl6)
 {
-	struct arpdata *arp_data;
+	char src[INET6_ADDRSTRLEN], dst[INET6_ADDRSTRLEN];
+
+	inet_ntop(AF_INET6, &fl6->saddr, src, sizeof(src));
+	inet_ntop(AF_INET6, &fl6->daddr, dst, sizeof(dst));
+
+	print_transport(&fl6->trans, src, dst);
+}
+
+static void print_ipv4(const struct flow_ip4 *fl4)
+{
+	char src[INET_ADDRSTRLEN], dst[INET_ADDRSTRLEN];
+
+	inet_ntop(AF_INET, &fl4->saddr, src, sizeof(src));
+	inet_ntop(AF_INET, &fl4->daddr, dst, sizeof(dst));
+
+	print_transport(&fl4->trans, src, dst);
+}
+
+static void print_arphdr(const struct flow_arp *fla)
+{
 	char addr[INET_ADDRSTRLEN];
 
-	if (arph->ar_pro != htons(ETH_P_IP) || arph->ar_pln != 4) {
-		printf("    protocol address not IPv4");
-		return;
-	}
-
-	if (ntohs(arph->ar_hrd) != ARPHRD_ETHER || arph->ar_hln != ETH_ALEN) {
-		printf("    hardware address not ethernet");
-		return;
-	}
-
-	if (len < sizeof(*arp_data)) {
-		printf("    packet sample snippet too small for arp data\n");
-		return;
-	}
-	arp_data = (struct arpdata *)(arph + 1);
-	inet_ntop(AF_INET, &arp_data->ar_sip, addr, sizeof(addr));
+	inet_ntop(AF_INET, &fla->data.ar_sip, addr, sizeof(addr));
 	printf("sender: %s ", addr);
-	print_mac(arp_data->ar_sha, false);
+	print_mac(fla->data.ar_sha, false);
 
-	inet_ntop(AF_INET, &arp_data->ar_tip, addr, sizeof(addr));
+	inet_ntop(AF_INET, &fla->data.ar_tip, addr, sizeof(addr));
 	printf(" target: %s ", addr);
-	print_mac(arp_data->ar_tha, false);
+	print_mac(fla->data.ar_tha, false);
 }
 
-static void print_arp(const __u8 *data, __u32 len)
+static void print_arp(const struct flow_arp *fla)
 {
-	const struct arphdr *arph = (const struct arphdr *)data;
-
-	if (len < sizeof(*arph)) {
-		printf("    packet snippet too small for arp header\n");
-		return;
-	}
-	len -= sizeof(*arph);
-
 	printf("    ");
-	switch(ntohs(arph->ar_op)) {
+
+	switch(fla->op) {
 	case ARPOP_REQUEST:
 		printf("arp request: ");
-		print_arphdr(arph, len);
 		break;
 	case ARPOP_REPLY:
 		printf("arp reply: ");
-		print_arphdr(arph, len);
 		break;
 	case ARPOP_RREQUEST:
 		printf("rarp request: ");
-		print_arphdr(arph, len);
 		break;
 	case ARPOP_RREPLY:
 		printf("rarp reply: ");
-		print_arphdr(arph, len);
 		break;
 	default:
-		printf("arp op %x: ", ntohs(arph->ar_op));
-		print_arphdr(arph, len);
+		printf("arp op %x: ", fla->op);
 		break;
 	}
+	print_arphdr(fla);
 	printf("\n");
 }
 
-static void print_ipv4(const __u8 *data, __u32 len)
+void print_flow(const struct flow *fl)
 {
-	const struct iphdr *iph = (const struct iphdr *)data;
-	char src[INET_ADDRSTRLEN], dst[INET_ADDRSTRLEN];
-	const struct udphdr *udph;
-	const struct tcphdr *tcph;
-	unsigned int hlen;
+	print_mac(fl->smac, false);
+	printf(" -> ");
+	print_mac(fl->dmac, false);
 
-	if (len < sizeof(*iph)) {
-		printf("    packet snippet too small for ipv4 header\n");
-		dump_data(data, len);
-		return;
+	if (fl->has_vlan) {
+		u16 vlan, prio;
+
+		vlan = fl->vlan.outer_vlan_TCI & VLAN_VID_MASK;
+		printf(" vlan %u", vlan);
+
+		prio = (fl->vlan.outer_vlan_TCI & VLAN_PRIO_MASK);
+		prio >>= VLAN_PRIO_SHIFT;
+		if (prio)
+			printf(" prio %u", prio);
 	}
 
-	inet_ntop(AF_INET, &iph->saddr, src, sizeof(src));
-	inet_ntop(AF_INET, &iph->daddr, dst, sizeof(dst));
-
-	hlen = iph->ihl << 2;
-	switch(iph->protocol) {
-	case IPPROTO_TCP:
-		if (len < hlen + sizeof(*tcph)) {
-			printf("    ipv4 packet snippet too small for tcp ports\n");
-			return;
-		}
-		tcph = (struct tcphdr *)(data + hlen);
-		print_tcp(tcph, src, dst);
-		break;
-	case IPPROTO_UDP:
-		if (len < hlen + sizeof(*udph)) {
-			printf("    ipv4 packet snippet too small for udp ports\n");
-			return;
-		}
-		udph = (struct udphdr *)(data + hlen);
-		print_udp(udph, src, dst);
-		break;
-	case IPPROTO_VRRP:
-		printf("    VRRP: src=%s -> dst=%s\n",
-			src, dst);
-		break;
-	default:
-		printf("    protocol %d packet: src=%s -> dst=%s\n",
-			iph->protocol, src, dst);
-		//dump_data(data, len);
-	}
-
-	return;
-}
-
-void print_pkt(__u16 protocol, __u8 *data, int len)
-{
-	const struct ethhdr *eth = (const struct ethhdr *)data;
-	unsigned int hlen = sizeof(*eth);
-
-	if (ntohs(eth->h_proto) == ETH_P_8021Q)
-		hlen += sizeof(struct vlan_hdr);
-
-	data += hlen;
-	len -= hlen;
-
-	switch(ntohs(protocol)) {
+	switch(fl->proto) {
 	case ETH_P_ARP:
-		print_arp(data, len);
+		print_arp(&fl->arp);
 		break;
 	case ETH_P_IP:
-		print_ipv4(data, len);
+		print_ipv4(&fl->ip4);
 		break;
 	case ETH_P_IPV6:
-		print_ipv6(data, len);
+		print_ipv6(&fl->ip6);
 		break;
 	case ETH_P_LLDP:
 		printf("    LLDP\n");
 		break;
 	default:
-		data -= hlen;
-		len += hlen;
-		printf("    unknown packet, ethernet protocol %x\n",
-			ntohs(protocol));
-		dump_data(data, len);
+		printf("    ethernet protocol %x\n", fl->proto);
 	}
+}
+
+void print_pkt(__u16 protocol, const __u8 *data, int len)
+{
+	struct flow fl = {};
+
+	if (parse_pkt(&fl, protocol, data, len))
+		printf("*** failed to parse packet ***\n");
+	else
+		print_flow(&fl);
 }
