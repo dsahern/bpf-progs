@@ -20,6 +20,8 @@ struct data {
 	u16	gso_size;
 	__be16	protocol;
 	u32	ifindex;
+	u16	vlan_tci;
+	__be16	vlan_proto;
 	u32	pkt_len;
 	u8	pkt_data[64];
 };

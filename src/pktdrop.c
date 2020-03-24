@@ -689,6 +689,10 @@ static void show_packet(struct data *data)
 	if (data->protocol || !is_unix) {
 		struct flow fl = {};
 
+		if (data->vlan_tci) {
+			fl.has_vlan = true;
+			fl.vlan.outer_vlan_TCI = data->vlan_tci;
+		}
 		if (parse_pkt(&fl, data->protocol, data->pkt_data, len))
 			printf("*** failed to parse ***\n");
 		else
