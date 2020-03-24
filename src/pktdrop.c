@@ -35,6 +35,8 @@ static unsigned int drop_thresh = 1;
 static unsigned int do_hist;
 static const char *hist_sort;
 static unsigned int nsid;
+static struct ksym_s *ovs_sym;
+static bool skip_ovs_upcalls;
 static bool done;
 static bool debug;
 
@@ -516,6 +518,8 @@ static void process_packet(struct data *data)
 	total_drops_by_type[data->pkt_type & PKT_TYPE_MAX]++;
 
 	sym = find_ksym(data->location);
+	if (skip_ovs_upcalls && sym == ovs_sym)
+		return;
 
 	dropl = find_dropl(data->location, sym ? sym->name : NULL);
 	if (dropl)
@@ -633,6 +637,9 @@ static void show_packet(struct data *data)
 		data->pkt_len, data->nr_frags, data->gso_size);
 
 	sym = find_ksym(data->location);
+	if (skip_ovs_upcalls && sym == ovs_sym)
+		return;
+
 	if (sym) {
 		u64 offset = data->location - sym->addr;
 
@@ -705,12 +712,13 @@ static void print_usage(char *prog)
 	printf(
 	"usage: %s OPTS\n\n"
 	"	-f bpf-file    bpf filename to load\n"
-	"	-k kallsyms    load kernel symbols from this file\n"
-	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip)\n"
-	"	-r rate        display rate (seconds) to dump summary\n"
-	"	-t num         only display entries with drops more than num\n"
 	"	-i             ignore kprobe error (4.14 can not install kprobe on fib_net_exit)\n"
+	"	-k kallsyms    load kernel symbols from this file\n"
 	"	-m count       set number of pages in perf buffers\n"
+	"	-o             ignore ovs upcalls\n"
+	"	-r rate        display rate (seconds) to dump summary\n"
+	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip)\n"
+	"	-t num         only display entries with drops more than num\n"
 	, basename(prog));
 }
 
@@ -734,7 +742,7 @@ int main(int argc, char **argv)
 	int pg_cnt = 0;
 	int rc, r;
 
-	while ((rc = getopt(argc, argv, "f:ik:r:s:t:m:")) != -1)
+	while ((rc = getopt(argc, argv, "f:ik:m:or:s:t:")) != -1)
 	{
 		switch(rc) {
 		case 'f':
@@ -746,6 +754,15 @@ int main(int argc, char **argv)
 			break;
 		case 'k':
 			kallsyms = optarg;
+			break;
+		case 'm':
+			if (str_to_int(optarg, 64, 32768, &pg_cnt)) {
+				fprintf(stderr, "Invalid page count\n");
+				return 1;
+			}
+			break;
+		case 'o':
+			skip_ovs_upcalls = true;
 			break;
 		case 'r':
 			r = atoi(optarg);
@@ -784,12 +801,6 @@ int main(int argc, char **argv)
 			}
 			drop_thresh = r;
 			break;
-		case 'm':
-			if (str_to_int(optarg, 64, 32768, &pg_cnt)) {
-				fprintf(stderr, "Invalid page count\n");
-				return 1;
-			}
-			break;
 		default:
 			print_usage(argv[0]);
 			return 1;
@@ -804,6 +815,13 @@ int main(int argc, char **argv)
 
 	if (load_ksyms(kallsyms))
 		return 1;
+
+	ovs_sym = find_ksym_by_name("queue_userspace_packet");
+	if (skip_ovs_upcalls && !ovs_sym) {
+		fprintf(stderr,
+			"Failed to find symbol entry for queue_userspace_packet\n");
+		return 1;
+	}
 
 	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
