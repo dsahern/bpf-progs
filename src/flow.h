@@ -87,8 +87,6 @@ struct flow {
 
 	struct flow_vlan vlan;
 
-	__u8 net_family;
-
 	union {
 		struct flow_arp arp;
 		struct flow_ip4 ip4;
