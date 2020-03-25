@@ -835,7 +835,7 @@ static void sig_handler(int signo)
 	done = true;
 }
 
-static void print_usage(char *prog)
+static void print_dropmon_usage(char *prog)
 {
 	printf(
 	"usage: %s OPTS\n\n"
@@ -851,7 +851,7 @@ static void print_usage(char *prog)
 	, basename(prog));
 }
 
-int main(int argc, char **argv)
+static int drop_monitor(int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = { };
 	const char *kallsyms = "/proc/kallsyms";
@@ -937,7 +937,7 @@ int main(int argc, char **argv)
 			skip_unix = true;
 			break;
 		default:
-			print_usage(argv[0]);
+			print_dropmon_usage(argv[0]);
 			return 1;
 		}
 	}
@@ -993,4 +993,40 @@ int main(int argc, char **argv)
 
 	/* main event loop */
 	return perf_event_loop(NULL, NULL, pktdrop_complete);
+}
+
+static const struct {
+	const char *name;
+	int (*fn)(int argc, char **argv);
+} cmds[] = {
+	{ .name = "drop", .fn = drop_monitor },
+};
+
+static void print_main_usage(const char *prog)
+{
+	fprintf(stderr, "usage: %s { drop }\n", prog);
+}
+
+int main(int argc, char **argv)
+{
+	const char *prog = basename(argv[0]);
+	const char *cmd;
+	int i;
+
+	if (argc < 2) {
+		print_main_usage(prog);
+		return 1;
+	}
+
+	cmd = argv[1];
+	argc--;
+	argv++;
+
+	for (i = 0; i < ARRAY_SIZE(cmds); ++i) {
+		if (!strcmp(cmds[i].name, cmd))
+			return cmds[i].fn(argc, argv);
+	}
+
+	fprintf(stderr, "Invalid command\n");
+	return 1;
 }
