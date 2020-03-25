@@ -50,7 +50,6 @@ static void tod_from_mono(__u64 stime, struct timeval *tv_res)
 char *timestamp(char *buf, int len, __u64 stime)
 {
 	struct timeval tv;
-	struct tm ltime;
 
 	buf[0] = '\0';
 	if (len < 64)
@@ -74,13 +73,20 @@ char *timestamp(char *buf, int len, __u64 stime)
 	else
 		gettimeofday(&tv, NULL);
 
-	if (localtime_r(&tv.tv_sec, &ltime) == NULL)
+	return timestamp_tv(&tv, buf, len);
+}
+
+char *timestamp_tv(const struct timeval *tv, char *buf, int len)
+{
+	struct tm ltime;
+
+	if (localtime_r(&tv->tv_sec, &ltime) == NULL)
 		buf[0] = '\0';
 	else {
 		char date[64];
 
 		strftime(date, sizeof(date), "%H:%M:%S", &ltime);
-		snprintf(buf, len, "%s.%06d", date, (int) tv.tv_usec);
+		snprintf(buf, len, "%s.%06d", date, (int) tv->tv_usec);
 	}
 
 	return buf;

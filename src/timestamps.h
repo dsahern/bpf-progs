@@ -48,6 +48,7 @@ static inline void print_time_usecs(unsigned long long nsecs)
 
 int set_reftime(void);
 char *timestamp(char *buf, int len, __u64 stime);
+char *timestamp_tv(const struct timeval *tv, char *buf, int len);
 
 int enable_sw_tstamp(void);
 int enable_hw_tstamp(const char *dev);
