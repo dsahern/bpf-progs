@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Packet analysis program
  * - dropped packets via an ebpf program on kfree_skb.
+ * - analyze packets from a pcap file or live
  *
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
@@ -17,6 +18,8 @@
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>
+#define PCAP_DONT_INCLUDE_PCAP_BPF_H
+#include <pcap.h>
 
 #include <bpf/bpf.h>
 
@@ -32,6 +35,7 @@
 
 static __u64 display_rate = 10 * NSEC_PER_SEC;
 static __u64 t_last_display;
+static bool update_display;
 static unsigned int drop_thresh = 1;
 static unsigned int do_hist;
 static const char *hist_sort;
@@ -868,8 +872,13 @@ static int check_sort_arg(const char *arg)
 
 static void sig_handler(int signo)
 {
-	printf("Terminating by signal %d\n", signo);
-	done = true;
+	if (signo == SIGALRM) {
+		update_display = 1;
+		alarm(display_rate);
+	} else {
+		printf("Terminating by signal %d\n", signo);
+		done = true;
+	}
 }
 
 static void print_dropmon_usage(const char *prog)
@@ -1016,16 +1025,221 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	return perf_event_loop(NULL, NULL, pktdrop_complete);
 }
 
+static unsigned int pktcnt;
+static int snaplen = 100;
+static unsigned int total_pkts = 0;
+static pcap_t *ph;
+
+static void display_pcap_results(void)
+{
+	char buf[64];
+	int i;
+
+	printf("\n%s: ", timestamp(buf, sizeof(buf), 0));
+	printf("sort by %s,", hist_sort);
+	printf(" total packets: %u:\n", total_pkts);
+	total_pkts = 0;
+
+	switch (do_hist) {
+	case HIST_BY_FLOW:
+		show_flow_buckets();
+		break;
+	default:
+		printf("    %17s", "");
+		for (i = 0; i < HIST_MAX; i++) {
+			if (!hist_desc[i].skip)
+				printf("  %10s", hist_desc[i].str);
+		}
+		printf("  %10s\n", "total");
+
+		show_hist_buckets();
+	}
+
+	update_display = 0;
+}
+
+static void packet_handler(u_char *udata, const struct pcap_pkthdr *pkthdr,
+			   const u_char *packet)
+{
+	struct flow fl = {};
+
+	total_pkts++;
+	if (parse_pkt(&fl, 0, packet, pkthdr->caplen)) {
+		printf("*** failed to parse ***\n");
+		return;
+	}
+
+	if (do_hist) {
+		do_histogram(&fl, 0);
+		if (update_display)
+			display_pcap_results();
+	} else {
+		char buf[64];
+
+		printf("%15s  ", timestamp_tv(&pkthdr->ts, buf, sizeof(buf)));
+		printf("  %3u  ", pkthdr->len);
+		print_flow(&fl);
+	}
+
+	if (pktcnt && total_pkts >= pktcnt) {
+		pcap_breakloop(ph);
+		done = 1;
+	}
+}
+
+static int handle_pcap(const char *file, const char *dev)
+{
+	char errbuf[PCAP_ERRBUF_SIZE];
+
+	if (file) {
+		ph = pcap_open_offline(file, errbuf);
+		if (!ph) {
+			fprintf(stderr,"pcap_open_offline failed: %s\n", errbuf);
+			return 1;
+		}
+	} else {
+		ph = pcap_open_live(dev, snaplen, 0, 1000, errbuf);
+		if (!ph) {
+			fprintf(stderr,"pcap_open_live failed: %s\n", errbuf);
+			return 1;
+		}
+	}
+
+	if (do_hist)
+		alarm(display_rate);
+
+	while (pcap_dispatch(ph, pktcnt ? : -1, packet_handler, NULL) && !done)
+		;
+
+	/* And close the session */
+	pcap_close(ph);
+
+	if (do_hist)
+		display_pcap_results();
+
+	return 0;
+}
+
+static void print_pcap_usage(const char *prog)
+{
+	printf(
+	"usage: %s OPTS\n\n"
+	"	-c count       Number of packets analyze\n"
+	"	-f name        analyze packets in given file\n"
+	"	-i interface   device to collect packets live\n"
+	"	-l len         snaplen for live packet captures\n"
+	"	-r rate        display rate (seconds) to dump summary\n"
+	"	-s <type>      show summary by type (dmac, smac, dip, sip, flow)\n"
+	"	-t num         only display entries with drops more than num\n"
+	, prog);
+}
+
+static int pcap_analysis(const char *prog, int argc, char **argv)
+{
+	const char *file = NULL;
+	const char *dev = NULL;
+	int rc, r;
+
+	display_rate /= NSEC_PER_SEC;
+
+	while ((rc = getopt(argc, argv, "c:f:hi:l:r:s:t:")) != -1)
+	{
+		switch(rc) {
+		case 'c':
+			pktcnt = atoi(optarg);
+			if (!pktcnt) {
+				fprintf(stderr, "Invalid count\n");
+				return 1;
+			}
+			break;
+		case 'f':
+			file = optarg;
+			break;
+		case 'i':
+			dev = optarg;
+			if (!strcmp(dev, "any")) {
+				fprintf(stderr, "'any' device not supported\n");
+				return 1;
+			}
+			break;
+		case 'l':
+			snaplen = atoi(optarg);
+			if (!snaplen) {
+				fprintf(stderr, "Invalid snaplen\n");
+				return 1;
+			}
+			break;
+		case 'r':
+			r = atoi(optarg);
+			if (!r) {
+				fprintf(stderr, "Invalid display rate\n");
+				return 1;
+			}
+			display_rate = r;
+			break;
+		case 's':
+			if (check_sort_arg(optarg))
+				return 1;
+			if (do_hist == HIST_BY_NETNS)
+				return 1;
+			break;
+		case 't':
+			r = atoi(optarg);
+			if (!r) {
+				fprintf(stderr, "Invalid drop threshold\n");
+				return 1;
+			}
+			drop_thresh = r;
+			break;
+		case 'h':
+			print_pcap_usage(prog);
+			return 0;
+		default:
+			print_pcap_usage(prog);
+			return 1;
+		}
+	}
+
+	if (!file && !dev) {
+		fprintf(stderr, "No pcap file or device given\n");
+		return 1;
+	} else if (file && dev) {
+		fprintf(stderr, "device and file both given. pick one\n");
+		return 1;
+	}
+
+	switch(do_hist) {
+	case HIST_BY_DIP:
+	case HIST_BY_SIP:
+		hist_disable_non_ipv4();
+		break;
+	}
+
+	if (signal(SIGINT, sig_handler) ||
+	    signal(SIGHUP, sig_handler) ||
+	    signal(SIGALRM, sig_handler) ||
+	    signal(SIGTERM, sig_handler)) {
+		perror("signal");
+		return 1;
+	}
+
+	setlinebuf(stdout);
+	setlinebuf(stderr);
+
+	return handle_pcap(file, dev);
+}
+
 static const struct {
 	const char *name;
 	int (*fn)(const char *prog, int argc, char **argv);
 } cmds[] = {
 	{ .name = "drop", .fn = drop_monitor },
+	{ .name = "pcap", .fn = pcap_analysis },
 };
 
 static void print_main_usage(const char *prog)
 {
-	fprintf(stderr, "usage: %s { drop }\n", prog);
+	fprintf(stderr, "usage: %s { drop | pcap }\n", prog);
 }
 
 int main(int argc, char **argv)
@@ -1040,6 +1254,11 @@ int main(int argc, char **argv)
 	}
 
 	cmd = argv[1];
+	if (!strcmp(cmd, "help")) {
+		print_main_usage(prog);
+		return 0;
+	}
+
 	argc--;
 	argv++;
 

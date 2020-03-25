@@ -6,7 +6,7 @@ OBJDIR = obj/
 MODS += $(OBJDIR)execsnoop
 MODS += $(OBJDIR)opensnoop
 
-MODS += $(OBJDIR)pktdrop
+MODS += $(OBJDIR)netmon
 MODS += $(OBJDIR)pktlatency
 MODS += $(OBJDIR)ovslatency
 
@@ -51,6 +51,9 @@ $(OBJDIR)xdp_%: $(OBJDIR)xdp_%_user.o $(COMMON)
 
 $(OBJDIR)%.o: %.c
 	$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) -c $^ -o $@
+
+$(OBJDIR)netmon: $(OBJDIR)netmon.o $(COMMON)
+	$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS) -lpcap
 
 clean:
 	@rm -rf obj
