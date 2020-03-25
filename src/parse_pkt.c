@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Functions to pretty print packet headers
+/* Functions to parse packet and fill in flow struct
  *
  * David Ahern <dsahern@gmail.com>
  */
@@ -16,8 +16,15 @@
 
 #include "flow.h"
 
-static void parse_tcp(struct flow_tcp *fl_tcp, const struct tcphdr *tcph)
+static int parse_tcp(struct flow_tcp *fl_tcp, const __u8 *data, __u32 len)
 {
+	const struct tcphdr *tcph;
+
+	if (len < sizeof(*tcph))
+		return -1;
+
+	tcph = (struct tcphdr *)data;
+
 	fl_tcp->sport = ntohs(tcph->source);
 	fl_tcp->dport = ntohs(tcph->dest);
 
@@ -31,34 +38,34 @@ static void parse_tcp(struct flow_tcp *fl_tcp, const struct tcphdr *tcph)
 		fl_tcp->fin = 1;
 	if (tcph->rst)
 		fl_tcp->rst = 1;
+
+	return 0;
 }
 
-static void parse_udp(struct flow_udp *fl_udp, const struct udphdr *udph)
+static int parse_udp(struct flow_udp *fl_udp, const __u8 *data, __u32 len)
 {
+	const struct udphdr *udph;
+
+	if (len < sizeof(*udph))
+		return -1;
+
+	udph = (struct udphdr *)data;
+
 	fl_udp->sport = ntohs(udph->source);
 	fl_udp->dport = ntohs(udph->dest);
+
+	return 0;
 }
 
 static int parse_transport(struct flow_transport *flt,
 			   const __u8 *data, __u32 len)
 {
-	const struct udphdr *udph;
-	const struct tcphdr *tcph;
 
 	switch(flt->proto) {
 	case IPPROTO_TCP:
-		if (len < sizeof(*tcph))
-			return -1;
-
-		tcph = (struct tcphdr *)data;
-		parse_tcp(&flt->tcp, tcph);
-		break;
+		return parse_tcp(&flt->tcp, data, len);
 	case IPPROTO_UDP:
-		if (len < sizeof(*udph))
-			return -1;
-		udph = (struct udphdr *)data;
-		parse_udp(&flt->udp, udph);
-		break;
+		return parse_udp(&flt->udp, data, len);
 	}
 
 	return 0;
