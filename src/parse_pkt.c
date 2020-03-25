@@ -3,6 +3,8 @@
  *
  * David Ahern <dsahern@gmail.com>
  */
+#include <linux/types.h>
+#include <linux/icmpv6.h>
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/ipv6.h>
@@ -15,6 +17,11 @@
 #include <string.h>
 
 #include "flow.h"
+
+#define NDISC_ROUTER_SOLICITATION       133
+#define NDISC_ROUTER_ADVERTISEMENT      134
+#define NDISC_NEIGHBOUR_SOLICITATION    135
+#define NDISC_NEIGHBOUR_ADVERTISEMENT   136
 
 static int parse_tcp(struct flow_tcp *fl_tcp, const __u8 *data, __u32 len)
 {
@@ -57,6 +64,20 @@ static int parse_udp(struct flow_udp *fl_udp, const __u8 *data, __u32 len)
 	return 0;
 }
 
+static int parse_icmpv6(struct flow_icmp6 *fli, const __u8 *data, __u32 len)
+{
+	const struct icmp6hdr *icmp6;
+
+	if (len < sizeof(*icmp6))
+		return -1;
+
+	icmp6 = (const struct icmp6hdr *)data;
+	fli->icmp6_type = icmp6->icmp6_type;
+	fli->icmp6_code = icmp6->icmp6_code;
+
+	return 0;
+}
+
 static int parse_transport(struct flow_transport *flt,
 			   const __u8 *data, __u32 len)
 {
@@ -66,6 +87,8 @@ static int parse_transport(struct flow_transport *flt,
 		return parse_tcp(&flt->tcp, data, len);
 	case IPPROTO_UDP:
 		return parse_udp(&flt->udp, data, len);
+	case IPPROTO_ICMPV6:
+		return parse_icmpv6(&flt->icmp6, data, len);
 	}
 
 	return 0;

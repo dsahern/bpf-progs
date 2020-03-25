@@ -5,6 +5,7 @@
  */
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
+#include <linux/icmpv6.h>
 #include <linux/ipv6.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -44,6 +45,34 @@ static void print_udp(const struct flow_udp *fl, const char *src,
 		src, fl->sport, dst, fl->dport);
 }
 
+static void print_icmp6(const struct flow_icmp6 *fli, const char *src,
+			const char *dst)
+{
+	printf("  src=%s -> dst=%s ICMP ", src, dst);
+	switch(fli->icmp6_type) {
+	case NDISC_ROUTER_SOLICITATION:
+		printf("router solicitation\n");
+		break;
+	case NDISC_ROUTER_ADVERTISEMENT:
+		printf("router advertisement\n");
+		break;
+	case NDISC_NEIGHBOUR_SOLICITATION:
+		printf("neighbor solicitation\n");
+		break;
+	case NDISC_NEIGHBOUR_ADVERTISEMENT:
+		printf("neighbor advertisement\n");
+		break;
+	case ICMPV6_ECHO_REQUEST:
+		printf("echo request\n");
+		break;
+	case ICMPV6_ECHO_REPLY:
+		printf("echo reply\n");
+		break;
+	default:
+		printf("unknown %u/%u\n", fli->icmp6_type, fli->icmp6_code);
+	}
+}
+
 static void print_transport(const struct flow_transport *fl,
 			    const char *src, const char *dst)
 {
@@ -56,6 +85,9 @@ static void print_transport(const struct flow_transport *fl,
 		break;
 	case IPPROTO_VRRP:
 		printf("    VRRP: src=%s -> dst=%s\n", src, dst);
+		break;
+	case IPPROTO_ICMPV6:
+		print_icmp6(&fl->icmp6, src, dst);
 		break;
 	default:
 		printf("    protocol %u: src=%s -> dst=%s\n",

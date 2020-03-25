@@ -7,6 +7,11 @@
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 
+#define NDISC_ROUTER_SOLICITATION       133
+#define NDISC_ROUTER_ADVERTISEMENT      134
+#define NDISC_NEIGHBOUR_SOLICITATION    135
+#define NDISC_NEIGHBOUR_ADVERTISEMENT   136
+
 // https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 #define IPPROTO_VRRP 112
 
@@ -56,12 +61,18 @@ struct flow_udp {
 	__u16	dport;
 };
 
+struct flow_icmp6 {
+	__u8 icmp6_type;
+	__u8 icmp6_code;
+};
+
 struct flow_transport {
 	__u8 proto;
 
 	union {
 		struct flow_tcp tcp;
 		struct flow_udp udp;
+		struct flow_icmp6 icmp6;
 	};
 };
 
