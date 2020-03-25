@@ -4,6 +4,7 @@
  * Copyright (c) 2009-2020 David Ahern <dsahern@gmail.com>
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

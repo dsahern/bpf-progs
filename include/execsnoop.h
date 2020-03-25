@@ -15,11 +15,11 @@ enum event_type {
 };
 
 struct data {
-	u64 time;
-	u32 pid;
-	u32 ppid;
-	u16 event_type;
-	u16 cpu;
+	__u64 time;
+	__u32 pid;
+	__u32 ppid;
+	__u16 event_type;
+	__u16 cpu;
 	int retval;
 	char comm[TASK_COMM_LEN];
 	char arg[ARGSIZE];

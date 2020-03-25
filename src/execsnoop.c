@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
+#include <stdbool.h>
 #include <linux/bpf.h>
 #include <linux/rbtree.h>
 #include <stdio.h>
@@ -30,9 +31,9 @@ static bool done;
 struct task {
 	struct rb_node rb_node;
 
-	u64 time;
-	u32 pid;
-	u32 ppid;
+	__u64 time;
+	__u32 pid;
+	__u32 ppid;
 	char comm[TASK_COMM_LEN];
 	int narg;
 	char *arg[MAXARG + 1];
@@ -80,7 +81,7 @@ static struct task *get_task(struct data *data, bool create)
 {
 	struct rb_node **p = &all_tasks.rb_node;
 	struct rb_node *parent = NULL;
-	u32 pid = data->pid;
+	__u32 pid = data->pid;
 	struct task *task;
 
 	while (*p != NULL) {
@@ -125,7 +126,7 @@ static void print_header(void)
 	printf("%4s %6s %6s %6s   %s\n", "CPU", "PPID", "PID", "RET", "COMM");
 }
 
-static void show_timestamps(u64 start, u64 end)
+static void show_timestamps(__u64 start, __u64 end)
 {
 	char buf[64];
 

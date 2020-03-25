@@ -29,8 +29,8 @@
 
 #include "perf_events.c"
 
-static u64 display_rate = 10 * NSEC_PER_SEC;
-static u64 t_last_display;
+static __u64 display_rate = 10 * NSEC_PER_SEC;
+static __u64 t_last_display;
 static unsigned int drop_thresh = 1;
 static unsigned int do_hist;
 static const char *hist_sort;
@@ -72,7 +72,7 @@ enum {
 struct flow_entry {
 	struct list_head list;
 	unsigned int	hits;
-	u8		aging;
+	__u8		aging;
 	struct flow	flow;
 };
 
@@ -80,7 +80,7 @@ struct flow_entry {
 struct flow_buckets {
 	struct list_head flows;
 
-	u8		flow_count;
+	__u8		flow_count;
 	bool		overflow;
 	bool		failures;
 };
@@ -89,11 +89,11 @@ struct drop_hist {
 	struct rb_node rb_node;
 	union {
 		unsigned long	addr;
-		u8		dmac[8];  /* 8 > ETH_ALEN */
+		__u8		dmac[8];  /* 8 > ETH_ALEN */
 	};
 	char		name[16];
 	unsigned int	total_drops;
-	u8		aging;
+	__u8		aging;
 	bool		dead;
 	union {
 		unsigned int		buckets[HIST_MAX];
@@ -106,7 +106,7 @@ struct drop_loc {
 	unsigned long	addr;
 	char		name[64];
 	unsigned int	total_drops;
-	u8		aging;
+	__u8		aging;
 	bool		dead;
 };
 
@@ -177,7 +177,7 @@ static struct drop_hist *new_droph(unsigned long addr)
 	} else if (do_hist == HIST_BY_FLOW) {
 		INIT_LIST_HEAD(&droph->flb.flows);
 	} else if (debug) {
-		print_mac((u8 *)&addr, true);
+		print_mac((__u8 *)&addr, true);
 		printf("\n");
 	}
 
@@ -634,7 +634,7 @@ static void process_packet(struct data *data, struct ksym_s *sym)
 	struct drop_hist *droph;
 	struct drop_loc *dropl;
 	unsigned long addr = 0;
-	u8 *p = (u8 *)&addr, i;
+	__u8 *p = (__u8 *)&addr, i;
 	struct flow fl = {};
 
 	total_drops++;
@@ -741,11 +741,11 @@ static struct ksym_s *find_ksym_droph(unsigned long addr)
 
 static void show_packet(struct data *data, struct ksym_s *sym)
 {
-	u8 pkt_type = data->pkt_type & PKT_TYPE_MAX;
+	__u8 pkt_type = data->pkt_type & PKT_TYPE_MAX;
 	struct ksym_s *symns;
 	bool is_unix;
 	char buf[64];
-	u32 len;
+	__u32 len;
 
 	printf("%15s  %3u  ",
 	       timestamp(buf, sizeof(buf), data->time), data->ifindex);
@@ -756,19 +756,19 @@ static void show_packet(struct data *data, struct ksym_s *sym)
 	if (symns)
 		printf("%10s", symns->name);
 	else
-		printf("%lx", data->netns);
+		printf("%llx", data->netns);
 
 	printf("  %3u  %3u  %3u  ",
 		data->pkt_len, data->nr_frags, data->gso_size);
 
 	if (sym) {
-		u64 offset = data->location - sym->addr;
+		__u64 offset = data->location - sym->addr;
 
-		printf("%s+0x%lx (%lx)\n",
+		printf("%s+0x%llx (%llx)\n",
 		       sym->name, offset, data->location);
 		is_unix = sym->is_unix;
 	} else {
-		printf("%lx\n", data->location);
+		printf("%llx\n", data->location);
 		is_unix = false;
 	}
 
@@ -819,7 +819,7 @@ static int pktdrop_complete(void)
 	process_events();
 
 	if (do_hist) {
-		u64 t_mono = get_time_ns(CLOCK_MONOTONIC);
+		__u64 t_mono = get_time_ns(CLOCK_MONOTONIC);
 
 		if (t_mono > t_last_display + display_rate) {
 			t_last_display = t_mono;

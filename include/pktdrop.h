@@ -10,20 +10,20 @@ enum event_type {
 };
 
 struct data {
-	u64	time;
-	u64	location;
-	u64	netns;
-	u8	event_type;
-	u8	cpu;
-	u8	nr_frags;
-	u8	pkt_type;
-	u16	gso_size;
+	__u64	time;
+	__u64	location;
+	__u64	netns;
+	__u8	event_type;
+	__u8	cpu;
+	__u8	nr_frags;
+	__u8	pkt_type;
+	__u16	gso_size;
 	__be16	protocol;
-	u32	ifindex;
-	u16	vlan_tci;
+	__u32	ifindex;
+	__u16	vlan_tci;
 	__be16	vlan_proto;
-	u32	pkt_len;
-	u8	pkt_data[64];
+	__u32	pkt_len;
+	__u8	pkt_data[64];
 };
 
 /* order of arguments from

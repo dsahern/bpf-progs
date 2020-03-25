@@ -14,7 +14,7 @@
 /* bucket 7 is total number of packets */
 
 struct ovslat_hist_val {
-	u64 buckets[8];
+	__u64 buckets[8];
 };
 
 #endif

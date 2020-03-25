@@ -30,9 +30,9 @@ static void process_event(struct data *data)
 	/* nothing to do */
 }
 
-static void dump_buckets(u64 *buckets, u64 *prev_buckets)
+static void dump_buckets(__u64 *buckets, __u64 *prev_buckets)
 {
-	u64 diff[8];
+	__u64 diff[8];
 	char buf[64];
 	int i;
 
@@ -51,20 +51,20 @@ static void dump_buckets(u64 *buckets, u64 *prev_buckets)
 		return;
 	}
 
-	printf("total number of packets %lu:\n", diff[7]);
+	printf("total number of packets %llu:\n", diff[7]);
 	printf("    time (usec)        count\n");
-	printf("       0  - %4u:   %'8lu\n", OVS_BUCKET_0, diff[0]);
-	printf("   %4u+  - %4u:   %'8lu\n", OVS_BUCKET_0, OVS_BUCKET_1, diff[1]);
-	printf("   %4u+  - %4u:   %'8lu\n", OVS_BUCKET_1, OVS_BUCKET_2, diff[2]);
-	printf("   %4u+  - %4u:   %'8lu\n", OVS_BUCKET_2, OVS_BUCKET_3, diff[3]);
-	printf("   %4u+  - %4u:   %'8lu\n", OVS_BUCKET_3, OVS_BUCKET_4, diff[4]);
-	printf("   %4u+  - %4u:   %'8lu\n", OVS_BUCKET_4, OVS_BUCKET_5, diff[5]);
-	printf("   %4u+  -   up:   %'8lu\n", OVS_BUCKET_5, diff[6]);
+	printf("       0  - %4u:   %'8llu\n", OVS_BUCKET_0, diff[0]);
+	printf("   %4u+  - %4u:   %'8llu\n", OVS_BUCKET_0, OVS_BUCKET_1, diff[1]);
+	printf("   %4u+  - %4u:   %'8llu\n", OVS_BUCKET_1, OVS_BUCKET_2, diff[2]);
+	printf("   %4u+  - %4u:   %'8llu\n", OVS_BUCKET_2, OVS_BUCKET_3, diff[3]);
+	printf("   %4u+  - %4u:   %'8llu\n", OVS_BUCKET_3, OVS_BUCKET_4, diff[4]);
+	printf("   %4u+  - %4u:   %'8llu\n", OVS_BUCKET_4, OVS_BUCKET_5, diff[5]);
+	printf("   %4u+  -   up:   %'8llu\n", OVS_BUCKET_5, diff[6]);
 }
 
 static int ovslat_dump_hist(int hist_map_fd)
 {
-	static u64 prev_buckets[8];
+	static __u64 prev_buckets[8];
 	struct ovslat_hist_val val;
 	__u32 idx = 0;
 

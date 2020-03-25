@@ -128,7 +128,7 @@ void print_flow(const struct flow *fl)
 	print_mac(fl->dmac, false);
 
 	if (fl->has_vlan) {
-		u16 vlan, prio;
+		__u16 vlan, prio;
 
 		vlan = fl->vlan.outer_vlan_TCI & VLAN_VID_MASK;
 		printf(" vlan %u", vlan);

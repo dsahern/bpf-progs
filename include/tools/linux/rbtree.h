@@ -19,6 +19,7 @@
 
 #include <linux/kernel.h>
 #include <linux/stddef.h>
+#include <stdbool.h>
 
 struct rb_node {
 	unsigned long  __rb_parent_color;

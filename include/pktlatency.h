@@ -17,19 +17,19 @@
 #define PKTLAT_MAX_BUCKETS 9
 
 struct pktlat_ctl {
-	u64 ptp_ref;
-	u64 mono_ref;
+	__u64 ptp_ref;
+	__u64 mono_ref;
 	int ifindex_min;  /* used to ignore packets on eth0, eth1 */
-	u32 latency_gen_sample;  /* latency at which a sample is generated */
-	u8  gen_samples;  /* send samples to userspace as well as histogram */
+	__u32 latency_gen_sample;  /* latency at which a sample is generated */
+	__u8  gen_samples;  /* send samples to userspace as well as histogram */
 };
 
 struct pktlat_hist_key {
-	u32 pid;
+	__u32 pid;
 };
 
 struct pktlat_hist_val {
-	u64 buckets[PKTLAT_MAX_BUCKETS];
+	__u64 buckets[PKTLAT_MAX_BUCKETS];
 };
 
 enum event_type {
@@ -38,15 +38,15 @@ enum event_type {
 };
 
 struct data {
-	u64	time;
-	s64	tstamp;
-	u32	ifindex;
-	u32	pkt_len;
-	u32	pid;
-	u8	event_type;
-	u8	cpu;
+	__u64	time;
+	__s64	tstamp;
+	__u32	ifindex;
+	__u32	pkt_len;
+	__u32	pid;
+	__u8	event_type;
+	__u8	cpu;
 	__be16	protocol;
-	u8	pkt_data[64];
+	__u8	pkt_data[64];
 };
 
 /* order of arguments from

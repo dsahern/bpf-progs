@@ -29,16 +29,16 @@
 struct task {
 	struct rb_node rb_node;
 
-	u32 pid;
+	__u32 pid;
 	char comm[16];
 
 	/* previous histogram buckets */
-	u64 buckets[PKTLAT_MAX_BUCKETS];
+	__u64 buckets[PKTLAT_MAX_BUCKETS];
 };
 
 static bool done;
-static u64 display_rate = 10 * NSEC_PER_SEC;
-static u64 latency_gen_sample = 200;
+static __u64 display_rate = 10 * NSEC_PER_SEC;
+static __u64 latency_gen_sample = 200;
 static pid_t disp_pid;
 
 static struct rb_root all_tasks;
@@ -134,7 +134,7 @@ out:
 		close(fd);
 }
 
-static struct task *get_task(u32 pid, bool create)
+static struct task *get_task(__u32 pid, bool create)
 {
 	struct rb_node **p = &all_tasks.rb_node;
 	struct rb_node *parent = NULL;
@@ -174,7 +174,7 @@ static void print_header(void)
 		"", "", "", "", "", "(msec)");
 }
 
-static u64 ptp_mono_ref, ptp_ref;
+static __u64 ptp_mono_ref, ptp_ref;
 
 static int update_ptp_reftime(void)
 {
@@ -203,10 +203,10 @@ static int update_ptp_reftime(void)
 
 static void hwtimestamp(__u64 hwtime, __u64 stime)
 {
-	u64 dt = 0;
+	__u64 dt = 0;
 
 	if (ptp_ref) {
-		u64 hw_mono;
+		__u64 hw_mono;
 
 		/* logic:
 		 * ----|------|--------|----
@@ -234,17 +234,17 @@ static void hwtimestamp(__u64 hwtime, __u64 stime)
 		struct timeval tv_hwtime = ns_to_timeval(hwtime);
 		struct timeval tv_stime = ns_to_timeval(stime);
 
-		printf(" hw %ld.%06ld  ref %ld.%06ld dt %ld",
+		printf(" hw %ld.%06ld  ref %ld.%06ld dt %lld",
 		       tv_hwtime.tv_sec, tv_hwtime.tv_usec,
 		       tv_stime.tv_sec, tv_stime.tv_usec,
 		       dt);
 	} else {
-		u64 msecs, usecs;
+		__u64 msecs, usecs;
 
 		msecs = dt / NSEC_PER_MSEC;
 		dt -= msecs * NSEC_PER_MSEC;
 		usecs = dt / NSEC_PER_USEC;
-		printf(" %2lu.%03lu", msecs, usecs);
+		printf(" %2llu.%03llu", msecs, usecs);
 	}
 }
 
@@ -273,7 +273,7 @@ static void process_event(struct data *data)
 		hwtimestamp(data->tstamp, data->time);
 
 		if (data->protocol) {
-			u32 len = data->pkt_len;
+			__u32 len = data->pkt_len;
 
 			if (len > sizeof(data->pkt_data))
 				len = sizeof(data->pkt_data);
@@ -289,9 +289,9 @@ static void process_event(struct data *data)
 	}
 }
 
-static void dump_buckets(struct task *task, u64 *buckets)
+static void dump_buckets(struct task *task, __u64 *buckets)
 {
-	u64 diff[PKTLAT_MAX_BUCKETS], npkts = 0;
+	__u64 diff[PKTLAT_MAX_BUCKETS], npkts = 0;
 	int i;
 
 	for (i = 0; i < PKTLAT_MAX_BUCKETS; ++i) {
@@ -311,17 +311,17 @@ static void dump_buckets(struct task *task, u64 *buckets)
 	}
 
 	printf("      time (usec)        count\n");
-	printf("         0  - %4u:   %'8lu\n", PKTLAT_BUCKET_0, diff[0]);
-	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_0, PKTLAT_BUCKET_1, diff[1]);
-	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_1, PKTLAT_BUCKET_2, diff[2]);
-	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_2, PKTLAT_BUCKET_3, diff[3]);
-	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_3, PKTLAT_BUCKET_4, diff[4]);
-	printf("     %4u+  - %4u:   %'8lu\n", PKTLAT_BUCKET_4, PKTLAT_BUCKET_5, diff[5]);
-	printf("     %4u+  -   up:   %'8lu\n", PKTLAT_BUCKET_5, diff[6]);
+	printf("         0  - %4u:   %'8llu\n", PKTLAT_BUCKET_0, diff[0]);
+	printf("     %4u+  - %4u:   %'8llu\n", PKTLAT_BUCKET_0, PKTLAT_BUCKET_1, diff[1]);
+	printf("     %4u+  - %4u:   %'8llu\n", PKTLAT_BUCKET_1, PKTLAT_BUCKET_2, diff[2]);
+	printf("     %4u+  - %4u:   %'8llu\n", PKTLAT_BUCKET_2, PKTLAT_BUCKET_3, diff[3]);
+	printf("     %4u+  - %4u:   %'8llu\n", PKTLAT_BUCKET_3, PKTLAT_BUCKET_4, diff[4]);
+	printf("     %4u+  - %4u:   %'8llu\n", PKTLAT_BUCKET_4, PKTLAT_BUCKET_5, diff[5]);
+	printf("     %4u+  -   up:   %'8llu\n", PKTLAT_BUCKET_5, diff[6]);
 	printf("\n");
-	printf("     total packets:   %'8lu\n", npkts);
-	printf("           average:   %'8lu\n", diff[8] / npkts);
-	printf(" missing timestamp:   %'8lu\n", diff[7]);
+	printf("     total packets:   %'8llu\n", npkts);
+	printf("           average:   %'8llu\n", diff[8] / npkts);
+	printf(" missing timestamp:   %'8llu\n", diff[7]);
 }
 
 static int hist_map_fd;
@@ -368,7 +368,7 @@ static int gen_samples;
 static int pktlat_setup_ctl_map(void)
 {
 	struct pktlat_ctl ctl;
-	u32 idx = 0;
+	__u32 idx = 0;
 	int err;
 
 	if (update_ptp_reftime())
@@ -391,7 +391,7 @@ static int pktlat_setup_ctl_map(void)
 
 static int pktlat_process_events(void)
 {
-	u64 t_mono = get_time_ns(CLOCK_MONOTONIC);
+	__u64 t_mono = get_time_ns(CLOCK_MONOTONIC);
 
 	process_events();
 

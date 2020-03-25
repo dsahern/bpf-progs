@@ -98,7 +98,7 @@ static void __process_event(struct event *event)
 }
 
 /* last event seen on this cpu */
-static u64 round_time;
+static __u64 round_time;
 
 /* mark the start of a round */
 static void set_round_time(void)
@@ -110,12 +110,12 @@ static void set_round_time(void)
 		return;
 	}
 
-	round_time = (u64) ts_to_ull(&ts);
+	round_time = (__u64) ts_to_ull(&ts);
 }
 
 void process_events(void)
 {
-	u64 end_time = round_time;
+	__u64 end_time = round_time;
 	struct rb_root *rb_root = &events;
 	struct rb_node *node;
 	struct event *event;
@@ -555,7 +555,7 @@ static int kprobe_event_type(void)
 /* modern way to do ebpf with kprobe - create the probe
  * with perf_event_open and attach program
  */
-static int __kprobe_perf_event(int prog_fd, const char *func, u64 addr,
+static int __kprobe_perf_event(int prog_fd, const char *func, __u64 addr,
 			       int retprobe, int attr_type)
 {
 	struct perf_event_attr attr = {
@@ -589,7 +589,7 @@ static int __kprobe_perf_event(int prog_fd, const char *func, u64 addr,
 	return fd;
 }
 
-int kprobe_perf_event(int prog_fd, const char *func, u64 addr, int retprobe)
+int kprobe_perf_event(int prog_fd, const char *func, __u64 addr, int retprobe)
 {
 	int attr_type;
 

@@ -13,13 +13,13 @@ enum event_type {
 };
 
 struct data {
-	u64 time;
-	u32 pid;
-	u32 ppid;
-	u32 flags;
-	u32 mode;
-	u16 event_type;
-	u16 cpu;
+	__u64 time;
+	__u32 pid;
+	__u32 ppid;
+	__u32 flags;
+	__u32 mode;
+	__u16 event_type;
+	__u16 cpu;
 	int retval;
 	char comm[TASK_COMM_LEN];
 	char filename[ARGSIZE];

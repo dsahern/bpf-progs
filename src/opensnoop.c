@@ -30,11 +30,11 @@ static bool done;
 
 struct task {
 	struct list_head list;
-	u64 time;
-	u32 pid;
-	u32 ppid;
-	u32 flags;
-	u32 mode;
+	__u64 time;
+	__u32 pid;
+	__u32 ppid;
+	__u32 flags;
+	__u32 mode;
 	char comm[TASK_COMM_LEN];
 	char *filename;
 };
@@ -86,7 +86,7 @@ static void print_header(void)
 	fflush(stdout);
 }
 
-static void show_timestamps(u64 start, u64 end)
+static void show_timestamps(__u64 start, __u64 end)
 {
 	char buf[64];
 
