@@ -38,6 +38,7 @@ static unsigned int nsid;
 static struct ksym_s *ovs_sym;
 static bool skip_ovs_upcalls;
 static bool skip_unix;
+static bool skip_tcp;
 static bool done;
 static bool debug;
 
@@ -802,6 +803,8 @@ static void process_event(struct data *data)
 			return;
 		if (skip_unix && sym->is_unix)
 			return;
+		if (skip_tcp && sym->is_tcp)
+			return;
 
 		if (do_hist)
 			process_packet(data, sym);
@@ -847,6 +850,7 @@ static void print_dropmon_usage(char *prog)
 	"	-r rate        display rate (seconds) to dump summary\n"
 	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip, flow)\n"
 	"	-t num         only display entries with drops more than num\n"
+	"	-T             ignore tcp drops\n"
 	"	-U             ignore unix drops\n"
 	, basename(prog));
 }
@@ -871,7 +875,7 @@ static int drop_monitor(int argc, char **argv)
 	int pg_cnt = 0;
 	int rc, r;
 
-	while ((rc = getopt(argc, argv, "f:ik:m:Or:s:t:U")) != -1)
+	while ((rc = getopt(argc, argv, "f:ik:m:Or:s:t:TU")) != -1)
 	{
 		switch(rc) {
 		case 'f':
@@ -932,6 +936,9 @@ static int drop_monitor(int argc, char **argv)
 				return 1;
 			}
 			drop_thresh = r;
+			break;
+		case 'T':
+			skip_tcp = true;
 			break;
 		case 'U':
 			skip_unix = true;
