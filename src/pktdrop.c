@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Analyze dropped packets via an ebpf program on kfree_skb.
+/* Packet analysis program
+ * - dropped packets via an ebpf program on kfree_skb.
  *
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
@@ -630,12 +631,74 @@ static void process_exit(struct data *data)
 	}
 }
 
-static void process_packet(struct data *data, struct ksym_s *sym)
+static void do_histogram(struct flow *fl, __u64	netns)
 {
 	struct drop_hist *droph;
-	struct drop_loc *dropl;
 	unsigned long addr = 0;
 	__u8 *p = (__u8 *)&addr, i;
+
+	switch(do_hist) {
+	case HIST_BY_NETNS:
+		addr = netns;
+		break;
+	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
+	case HIST_BY_DMAC:
+		for (i = 0; i < 6; ++i)
+			p[i] = fl->dmac[5-i];
+		break;
+	case HIST_BY_SMAC:
+		for (i = 0; i < 6; ++i)
+			p[i] = fl->smac[5-i];
+		break;
+	case HIST_BY_DIP:
+	case HIST_BY_SIP:
+		if (fl->proto != ETH_P_IP)
+			return;
+		if (do_hist == HIST_BY_DIP)
+			memcpy(&addr, &fl->ip4.daddr, 4);
+		else
+			memcpy(&addr, &fl->ip4.saddr, 4);
+		break;
+	default:
+		return;
+	}
+
+	droph = find_droph(addr, true);
+	if (!droph) {
+		fprintf(stderr, "failed to allocate droph for addr %lx\n",
+			addr);
+		return;
+	}
+
+	droph->total_drops++;
+
+	if (do_hist == HIST_BY_FLOW) {
+		process_flow(&droph->flb, fl);
+		return;
+	}
+
+	switch(fl->proto) {
+	case ETH_P_ARP:
+		process_arp(droph->buckets, &fl->arp);
+		break;
+        case ETH_P_IP:
+		process_ipv4(droph->buckets, &fl->ip4);
+		break;
+        case ETH_P_IPV6:
+		process_ipv6(droph->buckets, &fl->ip6);
+		break;
+        case ETH_P_LLDP:
+		droph->buckets[HIST_LLDP]++;
+		break;
+	default:
+		droph->buckets[HIST_OTHER]++;
+		break;
+	}
+}
+
+static void process_packet(struct data *data, struct ksym_s *sym)
+{
+	struct drop_loc *dropl;
 	struct flow fl = {};
 
 	total_drops++;
@@ -659,63 +722,7 @@ static void process_packet(struct data *data, struct ksym_s *sym)
 		return;
 	}
 
-	switch(do_hist) {
-	case HIST_BY_NETNS:
-		addr = data->netns;
-		break;
-	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
-	case HIST_BY_DMAC:
-		for (i = 0; i < 6; ++i)
-			p[i] = fl.dmac[5-i];
-		break;
-	case HIST_BY_SMAC:
-		for (i = 0; i < 6; ++i)
-			p[i] = fl.smac[5-i];
-		break;
-	case HIST_BY_DIP:
-	case HIST_BY_SIP:
-		if (fl.proto != ETH_P_IP)
-			return;
-		if (do_hist == HIST_BY_DIP)
-			memcpy(&addr, &fl.ip4.daddr, 4);
-		else
-			memcpy(&addr, &fl.ip4.saddr, 4);
-		break;
-	default:
-		return;
-	}
-
-	droph = find_droph(addr, true);
-	if (!droph) {
-		fprintf(stderr, "failed to allocate droph for addr %lx\n",
-			addr);
-		return;
-	}
-
-	droph->total_drops++;
-
-	if (do_hist == HIST_BY_FLOW) {
-		process_flow(&droph->flb, &fl);
-		return;
-	}
-
-	switch(fl.proto) {
-	case ETH_P_ARP:
-		process_arp(droph->buckets, &fl.arp);
-		break;
-        case ETH_P_IP:
-		process_ipv4(droph->buckets, &fl.ip4);
-		break;
-        case ETH_P_IPV6:
-		process_ipv6(droph->buckets, &fl.ip6);
-		break;
-        case ETH_P_LLDP:
-		droph->buckets[HIST_LLDP]++;
-		break;
-	default:
-		droph->buckets[HIST_OTHER]++;
-		break;
-	}
+	do_histogram(&fl, data->netns);
 }
 
 static struct ksym_s *find_ksym_droph(unsigned long addr)
@@ -832,13 +839,40 @@ static int pktdrop_complete(void)
 	return done;
 }
 
+static int check_sort_arg(const char *arg)
+{
+	if (strcmp(optarg, "netns") == 0) {
+		hist_sort = "network namespace";
+		do_hist = HIST_BY_NETNS;
+	} else if (strcmp(optarg, "dmac") == 0) {
+		hist_sort = "destination mac";
+		do_hist = HIST_BY_DMAC;
+	} else if (strcmp(optarg, "smac") == 0) {
+		hist_sort = "source mac";
+		do_hist = HIST_BY_SMAC;
+	} else if (strcmp(optarg, "dip") == 0) {
+		hist_sort = "destination ip";
+		do_hist = HIST_BY_DIP;
+	} else if (strcmp(optarg, "sip") == 0) {
+		hist_sort = "source ip";
+		do_hist = HIST_BY_SIP;
+	} else if (strcmp(optarg, "flow") == 0) {
+		hist_sort = "dmac and flow";
+		do_hist = HIST_BY_FLOW;
+	} else {
+		fprintf(stderr, "Invalid sort option\n");
+		return 1;
+	}
+	return 0;
+}
+
 static void sig_handler(int signo)
 {
 	printf("Terminating by signal %d\n", signo);
 	done = true;
 }
 
-static void print_dropmon_usage(char *prog)
+static void print_dropmon_usage(const char *prog)
 {
 	printf(
 	"usage: %s OPTS\n\n"
@@ -852,10 +886,10 @@ static void print_dropmon_usage(char *prog)
 	"	-t num         only display entries with drops more than num\n"
 	"	-T             ignore tcp drops\n"
 	"	-U             ignore unix drops\n"
-	, basename(prog));
+	, prog);
 }
 
-static int drop_monitor(int argc, char **argv)
+static int drop_monitor(const char *prog, int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = { };
 	const char *kallsyms = "/proc/kallsyms";
@@ -906,28 +940,8 @@ static int drop_monitor(int argc, char **argv)
 			display_rate = r * NSEC_PER_SEC;
 			break;
 		case 's':
-			if (strcmp(optarg, "netns") == 0) {
-				hist_sort = "network namespace";
-				do_hist = HIST_BY_NETNS;
-			} else if (strcmp(optarg, "dmac") == 0) {
-				hist_sort = "destination mac";
-				do_hist = HIST_BY_DMAC;
-			} else if (strcmp(optarg, "smac") == 0) {
-				hist_sort = "source mac";
-				do_hist = HIST_BY_SMAC;
-			} else if (strcmp(optarg, "dip") == 0) {
-				hist_sort = "destination ip";
-				do_hist = HIST_BY_DIP;
-			} else if (strcmp(optarg, "sip") == 0) {
-				hist_sort = "source ip";
-				do_hist = HIST_BY_SIP;
-			} else if (strcmp(optarg, "flow") == 0) {
-				hist_sort = "dmac and flow";
-				do_hist = HIST_BY_FLOW;
-			} else {
-				fprintf(stderr, "Invalid sort option\n");
+			if (check_sort_arg(optarg))
 				return 1;
-			}
 			break;
 		case 't':
 			r = atoi(optarg);
@@ -944,7 +958,7 @@ static int drop_monitor(int argc, char **argv)
 			skip_unix = true;
 			break;
 		default:
-			print_dropmon_usage(argv[0]);
+			print_dropmon_usage(prog);
 			return 1;
 		}
 	}
@@ -1004,7 +1018,7 @@ static int drop_monitor(int argc, char **argv)
 
 static const struct {
 	const char *name;
-	int (*fn)(int argc, char **argv);
+	int (*fn)(const char *prog, int argc, char **argv);
 } cmds[] = {
 	{ .name = "drop", .fn = drop_monitor },
 };
@@ -1031,7 +1045,7 @@ int main(int argc, char **argv)
 
 	for (i = 0; i < ARRAY_SIZE(cmds); ++i) {
 		if (!strcmp(cmds[i].name, cmd))
-			return cmds[i].fn(argc, argv);
+			return cmds[i].fn(prog, argc, argv);
 	}
 
 	fprintf(stderr, "Invalid command\n");
