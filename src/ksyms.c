@@ -25,8 +25,11 @@ struct ksym_s *new_ksym(unsigned long addr, const char *name, const char *mod)
 		sym->addr = addr;
 		sym->name = strdup(name);
 		sym->mod = strdup(mod);
+
 		if (!strncmp(name, "unix", 4))
 			sym->is_unix = true;
+		else if (!strncmp(name, "tcp_", 4))
+			sym->is_tcp = true;
 	}
 
 	return sym;

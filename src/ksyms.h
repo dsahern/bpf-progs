@@ -18,6 +18,7 @@ struct ksym_s {
 	char *mod;
 
 	bool is_unix;
+	bool is_tcp;
 };
 
 int load_ksyms(const char *file);
