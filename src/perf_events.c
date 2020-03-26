@@ -140,7 +140,7 @@ void process_events(void)
 /*
  * Add event to time sorted backlog queue
  */
-static int handle_bpf_output(void *_data, int size)
+static int __handle_bpf_output(void *_data, int size)
 {
 	struct data *data = _data;
 	struct event *event;
@@ -243,7 +243,7 @@ static int perf_event_poller_multi(int *fds,
 	int i;
 
 	if (!output_fn)
-		output_fn = handle_bpf_output;
+		output_fn = __handle_bpf_output;
 
 	pfds = calloc(num_fds, sizeof(*pfds));
 	if (!pfds)
