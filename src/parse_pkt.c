@@ -193,3 +193,8 @@ int parse_pkt(struct flow *flow, __u8 protocol, const __u8 *data, int len)
 
 	return 0;
 }
+
+int cmp_flow(const struct flow *fl1, const struct flow *fl2)
+{
+	return memcmp(fl1, fl2, sizeof(*fl1));
+}

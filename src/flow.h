@@ -107,5 +107,6 @@ struct flow {
 int parse_pkt(struct flow *flow, __u8 protocol, const __u8 *data, int len);
 void print_flow(const struct flow *fl);
 void print_pkt(__u16 protocol, const __u8 *data, int len);
+int cmp_flow(const struct flow *fl1, const struct flow *fl2);
 
 #endif

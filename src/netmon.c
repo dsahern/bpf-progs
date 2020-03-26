@@ -596,19 +596,27 @@ static void process_arp(unsigned int *buckets, const struct flow_arp *fla)
 	}
 }
 
+static struct flow_entry *find_flow_entry(struct flow_buckets *flb,
+					  struct flow *flow,
+					  int (*cmp)(const struct flow *fl1,
+						     const struct flow *fl2))
+{
+	struct flow_entry *fl_entry;
+
+	list_for_each_entry(fl_entry, &flb->flows, list) {
+		if (!cmp(&fl_entry->flow, flow))
+			return fl_entry;
+	}
+
+	return NULL;
+}
+
 static void process_flow(struct flow_buckets *flb, struct flow *flow)
 {
 	struct flow_entry *fl_entry;
-	bool found = false;
 
-	list_for_each_entry(fl_entry, &flb->flows, list) {
-		if (!memcmp(&fl_entry->flow, flow, sizeof(*flow))) {
-			found = true;
-			break;
-		}
-	}
-
-	if (!found) {
+	fl_entry = find_flow_entry(flb, flow, cmp_flow);
+	if (!fl_entry) {
 		if (flb->flow_count > MAX_FLOW_ENTRIES) {
 			flb->overflow = true;
 			return;
