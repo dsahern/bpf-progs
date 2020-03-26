@@ -194,6 +194,62 @@ int parse_pkt(struct flow *flow, __u8 protocol, const __u8 *data, int len)
 	return 0;
 }
 
+static int reverse_transport(const struct flow_transport *fl1,
+			     const struct flow_transport *fl2)
+{
+	if (fl1->proto != fl2->proto)
+		return -1;
+
+	switch(fl1->proto) {
+	case IPPROTO_TCP:
+		if (fl1->tcp.sport != fl2->tcp.dport ||
+		    fl1->tcp.dport != fl2->tcp.sport)
+			return -1;
+		break;
+	case IPPROTO_UDP:
+		if (fl1->udp.sport != fl2->udp.dport ||
+		    fl1->udp.dport != fl2->udp.sport)
+			return -1;
+		break;
+	default:
+		return -1;
+	}
+
+	return 0;
+}
+
+static int reverse_ipv6(const struct flow_ip6 *fl1, const struct flow_ip6 *fl2)
+{
+	if (memcmp(&fl1->saddr, &fl2->daddr, sizeof(fl1->saddr)) ||
+	    memcmp(&fl1->daddr, &fl2->saddr, sizeof(fl1->daddr)))
+		return -1;
+
+	return reverse_transport(&fl1->trans, &fl2->trans);
+}
+
+static int reverse_ipv4(const struct flow_ip4 *fl1, const struct flow_ip4 *fl2)
+{
+	if (fl1->saddr != fl2->daddr || fl1->daddr == fl2->saddr)
+		return -1;
+
+	return reverse_transport(&fl1->trans, &fl2->trans);
+}
+
+int cmp_flow_reverse(const struct flow *fl1, const struct flow *fl2)
+{
+	if (fl1->proto != fl2->proto)
+		return -1;
+
+	switch(fl1->proto) {
+	case ETH_P_IP:
+		return reverse_ipv4(&fl1->ip4, &fl2->ip4);
+	case ETH_P_IPV6:
+		return reverse_ipv6(&fl1->ip6, &fl2->ip6);
+	}
+
+	return -1;
+}
+
 int cmp_flow(const struct flow *fl1, const struct flow *fl2)
 {
 	return memcmp(fl1, fl2, sizeof(*fl1));

@@ -283,6 +283,28 @@ static struct drop_hist *find_droph(__u64 *addr, bool v6_key, bool create)
 	return droph;
 }
 
+static struct drop_hist *droph_lookup_reverse(struct flow *fl)
+{
+	__u64 addr[2];
+	__u32 *p32;
+
+	switch(fl->proto) {
+	case ETH_P_IP:
+		addr[1] = 0;
+		p32 = (__u32 *)&addr[0];
+		*p32 = fl->ip4.saddr;
+		break;
+	case ETH_P_IPV6:
+		memcpy(addr, &fl->ip6.saddr, sizeof(struct in6_addr));
+		break;
+	default:
+		return NULL;
+	}
+
+	/* v6 key is not relevant since we are not creating the bucket */
+	return find_droph(addr, false, false);
+}
+
 static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 				      bool create)
 {
@@ -297,7 +319,6 @@ static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 	case HIST_BY_NETNS:
 		addr[0] = netns;
 		break;
-	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
 	case HIST_BY_DMAC:
 		p8 = (__u8 *)&addr[0];
 		for (i = 0; i < 6; ++i)
@@ -308,6 +329,7 @@ static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 		for (i = 0; i < 6; ++i)
 			p8[i] = fl->smac[5-i];
 		break;
+	case HIST_BY_FLOW:   /* histogram by flow managed by dip */
 	case HIST_BY_DIP:
 		if (fl->proto == ETH_P_IP) {
 			p32 = (__u32 *)&addr[0];
@@ -679,6 +701,17 @@ static void process_flow(struct flow_buckets *flb, struct flow *flow)
 	struct flow_entry *fl_entry;
 
 	fl_entry = find_flow_entry(flb, flow, cmp_flow);
+	if (!fl_entry) {
+		struct drop_hist *droph;
+
+		/* flows are bi-directional; see if the reverse exists */
+		droph = droph_lookup_reverse(flow);
+		if (droph) {
+			fl_entry = find_flow_entry(&droph->flb, flow,
+						   cmp_flow_reverse);
+		}
+	}
+
 	if (!fl_entry) {
 		if (flb->flow_count > MAX_FLOW_ENTRIES) {
 			flb->overflow = true;
