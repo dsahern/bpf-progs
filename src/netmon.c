@@ -54,6 +54,7 @@ enum {
 	HIST_BY_DIP,
 	HIST_BY_SIP,
 	HIST_BY_FLOW,
+	HIST_BY_FLOW_SRC,
 };
 
 enum {
@@ -163,7 +164,8 @@ static struct drop_hist *new_droph(__u64 *addr)
 	droph->addr[0] = addr[0];
 	droph->addr[1] = addr[1];
 
-	if (do_hist == HIST_BY_NETNS) {
+	switch(do_hist) {
+	case HIST_BY_NETNS:
 		if (!addr[0]) {
 			strcpy(droph->name, "<unknown>");
 		} else {
@@ -176,8 +178,11 @@ static struct drop_hist *new_droph(__u64 *addr)
 				snprintf(droph->name, sizeof(droph->name),
 					 "netns-%d", nsid++);
 		}
-	} else if (do_hist == HIST_BY_FLOW) {
+		break;
+	case HIST_BY_FLOW:
+	case HIST_BY_FLOW_SRC:
 		INIT_LIST_HEAD(&droph->flb.flows);
+		break;
 	}
 
 	return droph;
@@ -189,13 +194,16 @@ static void remove_droph(struct drop_hist *droph)
 
 	rb_erase(&droph->rb_node, rb_root);
 
-	if (do_hist == HIST_BY_FLOW) {
+	switch(do_hist) {
+	case HIST_BY_FLOW:
+	case HIST_BY_FLOW_SRC: {
 		struct flow_buckets *flb = &droph->flb;
 		struct flow_entry *fl_entry, *fl_next;
 
 		list_for_each_entry_safe(fl_entry, fl_next, &flb->flows, list) {
 			list_del(&fl_entry->list);
 			free(fl_entry);
+		}
 		}
 	}
 
@@ -341,6 +349,7 @@ static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 			return NULL;
 		}
 		break;
+	case HIST_BY_FLOW_SRC: /* histogram by flow managed by sip */
 	case HIST_BY_SIP:
 		if (fl->proto == ETH_P_IP) {
 			p32 = (__u32 *)&addr[0];
@@ -596,12 +605,13 @@ static void show_hist(void)
 		printf("    %32s", "");
 		break;
 	case HIST_BY_FLOW:
+	case HIST_BY_FLOW_SRC:
 		break;
 	default:
 		printf("    %10s", "");
 	}
 
-	if (do_hist == HIST_BY_FLOW) {
+	if (do_hist == HIST_BY_FLOW || do_hist == HIST_BY_FLOW_SRC) {
 		show_flow_buckets();
 	} else {
 		for (i = 0; i < HIST_MAX; i++) {
@@ -750,7 +760,9 @@ static void do_histogram(struct flow *fl, __u64	netns)
 
 	droph->total_drops++;
 
-	if (do_hist == HIST_BY_FLOW) {
+	switch(do_hist) {
+	case HIST_BY_FLOW:
+	case HIST_BY_FLOW_SRC:
 		process_flow(&droph->flb, fl);
 		return;
 	}
@@ -935,8 +947,11 @@ static int check_sort_arg(const char *arg)
 		hist_sort = "source ip";
 		do_hist = HIST_BY_SIP;
 	} else if (strcmp(optarg, "flow") == 0) {
-		hist_sort = "dmac and flow";
+		hist_sort = "destination ip and flow";
 		do_hist = HIST_BY_FLOW;
+	} else if (strcmp(optarg, "flow-src") == 0) {
+		hist_sort = "source ip and flow";
+		do_hist = HIST_BY_FLOW_SRC;
 	} else {
 		fprintf(stderr, "Invalid sort option\n");
 		return 1;
@@ -965,7 +980,7 @@ static void print_dropmon_usage(const char *prog)
 	"	-m count       set number of pages in perf buffers\n"
 	"	-O             ignore ovs upcalls\n"
 	"	-r rate        display rate (seconds) to dump summary\n"
-	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip, flow)\n"
+	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip, flow, flow-src)\n"
 	"	-t num         only display entries with drops more than num\n"
 	"	-T             ignore tcp drops\n"
 	"	-U             ignore unix drops\n"
@@ -1112,6 +1127,7 @@ static void display_pcap_results(void)
 
 	switch (do_hist) {
 	case HIST_BY_FLOW:
+	case HIST_BY_FLOW_SRC:
 		show_flow_buckets();
 		break;
 	default:
@@ -1199,7 +1215,7 @@ static void print_pcap_usage(const char *prog)
 	"	-i interface   device to collect packets live\n"
 	"	-l len         snaplen for live packet captures\n"
 	"	-r rate        display rate (seconds) to dump summary\n"
-	"	-s <type>      show summary by type (dmac, smac, dip, sip, flow)\n"
+	"	-s <type>      show summary by type (dmac, smac, dip, sip, flow, flow-src)\n"
 	"	-t num         only display entries with drops more than num\n"
 	, prog);
 }
