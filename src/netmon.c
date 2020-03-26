@@ -93,7 +93,7 @@ struct flow_buckets {
 struct drop_hist {
 	struct rb_node rb_node;
 	union {
-		__u64		addr;
+		__u64		addr[2];
 		__u8		dmac[ETH_ALEN];
 	};
 	char		name[16];
@@ -152,20 +152,21 @@ static struct {
 	[HIST_OTHER]     = { .str = "other" },
 };
 
-static struct drop_hist *new_droph(__u64 addr)
+static struct drop_hist *new_droph(__u64 *addr)
 {
 	struct drop_hist *droph = calloc(1, sizeof(struct drop_hist));
 
 	if (!droph)
 		return NULL;
 
-	droph->addr = addr;
+	droph->addr[0] = addr[0];
+	droph->addr[1] = addr[1];
 
 	if (do_hist == HIST_BY_NETNS) {
-		if (!addr) {
+		if (!addr[0]) {
 			strcpy(droph->name, "<unknown>");
 		} else {
-			struct ksym_s *sym = find_ksym(addr);
+			struct ksym_s *sym = find_ksym(addr[0]);
 
 			if (sym)
 				strncpy(droph->name, sym->name,
@@ -200,11 +201,16 @@ static void remove_droph(struct drop_hist *droph)
 	free(droph);
 }
 
-static int droph_key_cmp(__u64 a1, __u64 a2)
+static int droph_key_cmp(__u64 *a1, __u64 *a2)
 {
-	if (a1 < a2)
+	if (a1[0] > a2[0])
 		return -1;
-	else if (a1 > a2)
+	else if (a1[0] < a2[0])
+		return 1;
+
+	if (a1[1] > a2[1])
+		return -1;
+	else if (a1[1] < a2[1])
 		return 1;
 
 	/* both are identical */
@@ -238,7 +244,7 @@ static int insert_droph(struct drop_hist *new_entry)
 	return 0;
 }
 
-static struct drop_hist *find_droph(__u64 addr, bool create)
+static struct drop_hist *find_droph(__u64 *addr, bool create)
 {
 	struct rb_root *rb_root = &all_drop_hists;
 	struct rb_node **node = &rb_root->rb_node;
@@ -275,30 +281,34 @@ static struct drop_hist *find_droph(__u64 addr, bool create)
 static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 				      bool create)
 {
-	unsigned long addr = 0;
-	__u8 *p = (__u8 *)&addr, i;
+	__u64 addr[2];
+	__u8 *p8 = (__u8 *)&addr[0], i;
+	__u32 *p32 = (__u32 *)&addr[0];
+
+	addr[1] = 0;
 
 	switch(do_hist) {
 	case HIST_BY_NETNS:
-		addr = netns;
+		addr[0] = netns;
 		break;
 	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
 	case HIST_BY_DMAC:
 		for (i = 0; i < 6; ++i)
-			p[i] = fl->dmac[5-i];
+			p8[i] = fl->dmac[5-i];
 		break;
 	case HIST_BY_SMAC:
 		for (i = 0; i < 6; ++i)
-			p[i] = fl->smac[5-i];
+			p8[i] = fl->smac[5-i];
 		break;
 	case HIST_BY_DIP:
+		if (fl->proto != ETH_P_IP)
+			return NULL;
+		*p32 = fl->ip4.daddr;
+		break;
 	case HIST_BY_SIP:
 		if (fl->proto != ETH_P_IP)
 			return NULL;
-		if (do_hist == HIST_BY_DIP)
-			memcpy(&addr, &fl->ip4.daddr, 4);
-		else
-			memcpy(&addr, &fl->ip4.saddr, 4);
+		*p32 = fl->ip4.saddr;
 		break;
 	default:
 		return NULL;
@@ -677,8 +687,11 @@ static void process_flow(struct flow_buckets *flb, struct flow *flow)
 static void process_exit(struct data *data)
 {
 	struct drop_hist *droph;
+	__u64 addr[2];
 
-	droph = find_droph(data->netns, false);
+	addr[0] = data->netns;
+	addr[1] = 0;
+	droph = find_droph(addr, false);
 	if (droph)
 		droph->dead = true;
 }
