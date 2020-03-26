@@ -11,9 +11,9 @@ This code is structured to make the data collection as much of a template
 as possible, so new programs can copy-modify and focus on the analysis at
 hand as much as possible.
 
-## pktdrop
+## netmon
 
-pktdrop is similar to dropwatch, but examines the packet headers and summarizes
+netmon is similar to dropwatch, but examines the packet headers and summarizes
 drops by a number of options:
 - source mac,
 - destination mac,
@@ -25,10 +25,10 @@ Network namespace support is best effort in determining the association. It has
 been used to look at drops for containers.
 
 ### show packet drops sorted by destination IP
-sudo src/obj/pktdrop -s dip
+sudo src/obj/netmon -s dip
 
 ### show packet drops sorted by destination mac
-sudo src/obj/pktdrop -s dmac
+sudo src/obj/netmon -s dmac
 
 ### TO-DO:
 - support for drops at XDP layer
