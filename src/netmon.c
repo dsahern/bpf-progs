@@ -45,7 +45,6 @@ static bool skip_ovs_upcalls;
 static bool skip_unix;
 static bool skip_tcp;
 static bool done;
-static bool debug;
 
 enum {
 	HIST_BY_NONE,
@@ -94,8 +93,8 @@ struct flow_buckets {
 struct drop_hist {
 	struct rb_node rb_node;
 	union {
-		unsigned long	addr;
-		__u8		dmac[8];  /* 8 > ETH_ALEN */
+		__u64		addr;
+		__u8		dmac[ETH_ALEN];
 	};
 	char		name[16];
 	unsigned int	total_drops;
@@ -153,7 +152,7 @@ static struct {
 	[HIST_OTHER]     = { .str = "other" },
 };
 
-static struct drop_hist *new_droph(unsigned long addr)
+static struct drop_hist *new_droph(__u64 addr)
 {
 	struct drop_hist *droph = calloc(1, sizeof(struct drop_hist));
 
@@ -162,10 +161,7 @@ static struct drop_hist *new_droph(unsigned long addr)
 
 	droph->addr = addr;
 
-	if (debug)
-		printf("new droph: ");
 	if (do_hist == HIST_BY_NETNS) {
-
 		if (!addr) {
 			strcpy(droph->name, "<unknown>");
 		} else {
@@ -178,13 +174,8 @@ static struct drop_hist *new_droph(unsigned long addr)
 				snprintf(droph->name, sizeof(droph->name),
 					 "netns-%d", nsid++);
 		}
-		if (debug)
-			printf("%s %lx\n", droph->name, addr);
 	} else if (do_hist == HIST_BY_FLOW) {
 		INIT_LIST_HEAD(&droph->flb.flows);
-	} else if (debug) {
-		print_mac((__u8 *)&addr, true);
-		printf("\n");
 	}
 
 	return droph;
@@ -209,6 +200,17 @@ static void remove_droph(struct drop_hist *droph)
 	free(droph);
 }
 
+static int droph_key_cmp(__u64 a1, __u64 a2)
+{
+	if (a1 < a2)
+		return -1;
+	else if (a1 > a2)
+		return 1;
+
+	/* both are identical */
+	return 0;
+}
+
 static int insert_droph(struct drop_hist *new_entry)
 {
 	struct rb_root *rb_root = &all_drop_hists;
@@ -217,12 +219,14 @@ static int insert_droph(struct drop_hist *new_entry)
 
 	while (*node != NULL) {
 		struct drop_hist *entry;
+		int rc;
 
 		parent = *node;
 		entry = container_of(parent, struct drop_hist, rb_node);
-		if (new_entry->addr < entry->addr)
+		rc = droph_key_cmp(new_entry->addr, entry->addr);
+		if (rc < 0)
 			node = &(*node)->rb_left;
-		else if (new_entry->addr > entry->addr)
+		else if (rc > 0)
 			node = &(*node)->rb_right;
 		else
 			return -EEXIST;
@@ -234,7 +238,7 @@ static int insert_droph(struct drop_hist *new_entry)
 	return 0;
 }
 
-static struct drop_hist *find_droph(unsigned long addr, bool create)
+static struct drop_hist *find_droph(__u64 addr, bool create)
 {
 	struct rb_root *rb_root = &all_drop_hists;
 	struct rb_node **node = &rb_root->rb_node;
@@ -242,12 +246,15 @@ static struct drop_hist *find_droph(unsigned long addr, bool create)
 	struct drop_hist *droph;
 
 	while (*node != NULL) {
+		int rc;
+
 		parent = *node;
 
 		droph = container_of(parent, struct drop_hist, rb_node);
-		if (addr < droph->addr)
+		rc = droph_key_cmp(addr, droph->addr);
+		if (rc < 0)
 			node = &(*node)->rb_left;
-		else if (addr > droph->addr)
+		else if (rc > 0)
 			node = &(*node)->rb_right;
 		else
 			return droph;
@@ -672,10 +679,8 @@ static void process_exit(struct data *data)
 	struct drop_hist *droph;
 
 	droph = find_droph(data->netns, false);
-	if (droph) {
-		printf("droph %s/%lx is dead\n", droph->name, droph->addr);
+	if (droph)
 		droph->dead = true;
-	}
 }
 
 static void do_histogram(struct flow *fl, __u64	netns)
