@@ -100,6 +100,7 @@ struct drop_hist {
 	unsigned int	total_drops;
 	__u8		aging;
 	bool		dead;
+	bool		v6_key;
 	union {
 		unsigned int		buckets[HIST_MAX];
 		struct flow_buckets	flb;
@@ -244,7 +245,7 @@ static int insert_droph(struct drop_hist *new_entry)
 	return 0;
 }
 
-static struct drop_hist *find_droph(__u64 *addr, bool create)
+static struct drop_hist *find_droph(__u64 *addr, bool v6_key, bool create)
 {
 	struct rb_root *rb_root = &all_drop_hists;
 	struct rb_node **node = &rb_root->rb_node;
@@ -270,7 +271,11 @@ static struct drop_hist *find_droph(__u64 *addr, bool create)
 		return NULL;
 
 	droph = new_droph(addr);
-	if (droph && insert_droph(droph)) {
+	if (!droph)
+		return NULL;
+
+	droph->v6_key = v6_key;
+	if (insert_droph(droph)) {
 		free(droph);
 		droph = NULL;
 	}
@@ -281,9 +286,10 @@ static struct drop_hist *find_droph(__u64 *addr, bool create)
 static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 				      bool create)
 {
+	bool v6_key = false;
 	__u64 addr[2];
-	__u8 *p8 = (__u8 *)&addr[0], i;
-	__u32 *p32 = (__u32 *)&addr[0];
+	__u8 *p8, i;
+	__u32 *p32;
 
 	addr[1] = 0;
 
@@ -293,28 +299,42 @@ static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 		break;
 	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
 	case HIST_BY_DMAC:
+		p8 = (__u8 *)&addr[0];
 		for (i = 0; i < 6; ++i)
 			p8[i] = fl->dmac[5-i];
 		break;
 	case HIST_BY_SMAC:
+		p8 = (__u8 *)&addr[0];
 		for (i = 0; i < 6; ++i)
 			p8[i] = fl->smac[5-i];
 		break;
 	case HIST_BY_DIP:
-		if (fl->proto != ETH_P_IP)
+		if (fl->proto == ETH_P_IP) {
+			p32 = (__u32 *)&addr[0];
+			*p32 = fl->ip4.daddr;
+		} else if (fl->proto == ETH_P_IPV6) {
+			memcpy(addr, &fl->ip6.daddr, sizeof(struct in6_addr));
+			v6_key = true;
+		} else {
 			return NULL;
-		*p32 = fl->ip4.daddr;
+		}
 		break;
 	case HIST_BY_SIP:
-		if (fl->proto != ETH_P_IP)
+		if (fl->proto == ETH_P_IP) {
+			p32 = (__u32 *)&addr[0];
+			*p32 = fl->ip4.saddr;
+		} else if (fl->proto == ETH_P_IPV6) {
+			memcpy(addr, &fl->ip6.saddr, sizeof(struct in6_addr));
+			v6_key = true;
+		} else {
 			return NULL;
-		*p32 = fl->ip4.saddr;
+		}
 		break;
 	default:
 		return NULL;
 	}
 
-	return find_droph(addr, create);
+	return find_droph(addr, v6_key, create);
 }
 
 static struct drop_loc *new_dropl(void)
@@ -387,16 +407,6 @@ static struct drop_loc *find_dropl(unsigned long addr, const char *name)
 	}
 
 	return dropl;
-}
-
-static void hist_disable_non_ipv4(void)
-{
-	hist_desc[HIST_LLDP].skip = true;
-	hist_desc[HIST_ARP].skip = true;
-	hist_desc[HIST_ARP_REQ].skip = true;
-	hist_desc[HIST_ARP_REPLY].skip = true;
-	hist_desc[HIST_ARP_OTHER].skip = true;
-	hist_desc[HIST_IPV6].skip = true;
 }
 
 static void show_loc_entries(void)
@@ -504,8 +514,9 @@ static void show_hist_buckets(void)
 			break;
 		case HIST_BY_DIP:
 		case HIST_BY_SIP:
-			inet_ntop(AF_INET, &droph->addr, buf, sizeof(buf));
-			printf("%17s ", buf);
+			inet_ntop(droph->v6_key ? AF_INET6 : AF_INET,
+				  &droph->addr, buf, sizeof(buf));
+			printf("%32s ", buf);
 			break;
 		}
 
@@ -560,7 +571,7 @@ static void show_hist(void)
 	case HIST_BY_SMAC:
 	case HIST_BY_DIP:
 	case HIST_BY_SIP:
-		printf("    %17s", "");
+		printf("    %32s", "");
 		break;
 	case HIST_BY_FLOW:
 		break;
@@ -691,7 +702,7 @@ static void process_exit(struct data *data)
 
 	addr[0] = data->netns;
 	addr[1] = 0;
-	droph = find_droph(addr, false);
+	droph = find_droph(addr, false, false);
 	if (droph)
 		droph->dead = true;
 }
@@ -1029,10 +1040,6 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		if (do_kprobe(obj, probes, 0) && !skip_kprobe_err)
 			return 1;
 		break;
-	case HIST_BY_DIP:
-	case HIST_BY_SIP:
-		hist_disable_non_ipv4();
-		break;
 	}
 
 	if (signal(SIGINT, sig_handler) ||
@@ -1075,7 +1082,7 @@ static void display_pcap_results(void)
 		show_flow_buckets();
 		break;
 	default:
-		printf("    %17s", "");
+		printf("    %32s", "");
 		for (i = 0; i < HIST_MAX; i++) {
 			if (!hist_desc[i].skip)
 				printf("  %10s", hist_desc[i].str);
@@ -1236,13 +1243,6 @@ static int pcap_analysis(const char *prog, int argc, char **argv)
 	} else if (file && dev) {
 		fprintf(stderr, "device and file both given. pick one\n");
 		return 1;
-	}
-
-	switch(do_hist) {
-	case HIST_BY_DIP:
-	case HIST_BY_SIP:
-		hist_disable_non_ipv4();
-		break;
 	}
 
 	if (signal(SIGINT, sig_handler) ||

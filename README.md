@@ -31,7 +31,6 @@ sudo src/obj/pktdrop -s dip
 sudo src/obj/pktdrop -s dmac
 
 ### TO-DO:
-- summarize by IPv6 source and destination addresses
 - support for drops at XDP layer
  
 ## pktlatency
