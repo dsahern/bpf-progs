@@ -39,8 +39,6 @@ static int parse_tcp(struct flow_tcp *fl_tcp, const __u8 *data, __u32 len)
 		fl_tcp->syn = 1;
 	if (tcph->ack)
 		fl_tcp->ack = 1;
-	if (tcph->psh)
-		fl_tcp->psh = 1;
 	if (tcph->fin)
 		fl_tcp->fin = 1;
 	if (tcph->rst)

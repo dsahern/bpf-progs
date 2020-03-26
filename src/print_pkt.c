@@ -28,8 +28,6 @@ static void print_tcp(const struct flow_tcp *fl, const char *src,
 		printf(" SYN");
 	if (fl->ack)
 		printf(" ACK");
-	if (fl->psh)
-		printf(" PSH");
 	if (fl->fin)
 		printf(" FIN");
 	if (fl->rst)

@@ -52,7 +52,6 @@ struct flow_tcp {
 	bool	fin;
 	bool	syn;
 	bool	rst;
-	bool	psh;
 	bool	ack;
 };
 
