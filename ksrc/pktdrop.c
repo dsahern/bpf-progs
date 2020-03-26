@@ -27,12 +27,12 @@ int bpf_kfree_skb(struct kfree_skb_args *ctx)
 		.cpu = (u8) bpf_get_smp_processor_id(),
 	};
 	struct sk_buff *skb = ctx->skbaddr;
-	u8 pkt_type, vlan_present;
 	struct net_device *dev;
 	u16 mhdr, nhdr, thdr;
 	unsigned char *head;
 	unsigned int end;
 	int ifindex = -1;
+	u8 pkt_type;
 
 	data.location = (u64)ctx->location;
 	data.protocol = htons(ctx->protocol);
@@ -67,15 +67,9 @@ int bpf_kfree_skb(struct kfree_skb_args *ctx)
 	if (!bpf_probe_read(&pkt_type, sizeof(pkt_type), &skb->__pkt_type_offset))
 		data.pkt_type = pkt_type & 7;
 
-	if (!bpf_probe_read(&vlan_present, sizeof(vlan_present),
-			    &skb->__pkt_vlan_present_offset)) {
-		if (vlan_present & 1) {
-			bpf_probe_read(&data.vlan_tci, sizeof(data.vlan_tci),
-				       &skb->vlan_tci);
-			bpf_probe_read(&data.vlan_proto, sizeof(data.vlan_proto),
-				       &skb->vlan_proto);
-		}
-	}
+	bpf_probe_read(&data.vlan_tci, sizeof(data.vlan_tci), &skb->vlan_tci);
+	bpf_probe_read(&data.vlan_proto, sizeof(data.vlan_proto),
+		       &skb->vlan_proto);
 
 	if (!bpf_probe_read(&head, sizeof(head), &skb->head) &&
 	    !bpf_probe_read(&mhdr, sizeof(mhdr), &skb->mac_header) &&
