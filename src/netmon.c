@@ -265,6 +265,41 @@ static struct drop_hist *find_droph(unsigned long addr, bool create)
 	return droph;
 }
 
+static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
+				      bool create)
+{
+	unsigned long addr = 0;
+	__u8 *p = (__u8 *)&addr, i;
+
+	switch(do_hist) {
+	case HIST_BY_NETNS:
+		addr = netns;
+		break;
+	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
+	case HIST_BY_DMAC:
+		for (i = 0; i < 6; ++i)
+			p[i] = fl->dmac[5-i];
+		break;
+	case HIST_BY_SMAC:
+		for (i = 0; i < 6; ++i)
+			p[i] = fl->smac[5-i];
+		break;
+	case HIST_BY_DIP:
+	case HIST_BY_SIP:
+		if (fl->proto != ETH_P_IP)
+			return NULL;
+		if (do_hist == HIST_BY_DIP)
+			memcpy(&addr, &fl->ip4.daddr, 4);
+		else
+			memcpy(&addr, &fl->ip4.saddr, 4);
+		break;
+	default:
+		return NULL;
+	}
+
+	return find_droph(addr, create);
+}
+
 static struct drop_loc *new_dropl(void)
 {
 	return calloc(1, sizeof(struct drop_loc));
@@ -646,41 +681,10 @@ static void process_exit(struct data *data)
 static void do_histogram(struct flow *fl, __u64	netns)
 {
 	struct drop_hist *droph;
-	unsigned long addr = 0;
-	__u8 *p = (__u8 *)&addr, i;
 
-	switch(do_hist) {
-	case HIST_BY_NETNS:
-		addr = netns;
-		break;
-	case HIST_BY_FLOW:   /* histogram by flow managed by dmac */
-	case HIST_BY_DMAC:
-		for (i = 0; i < 6; ++i)
-			p[i] = fl->dmac[5-i];
-		break;
-	case HIST_BY_SMAC:
-		for (i = 0; i < 6; ++i)
-			p[i] = fl->smac[5-i];
-		break;
-	case HIST_BY_DIP:
-	case HIST_BY_SIP:
-		if (fl->proto != ETH_P_IP)
-			return;
-		if (do_hist == HIST_BY_DIP)
-			memcpy(&addr, &fl->ip4.daddr, 4);
-		else
-			memcpy(&addr, &fl->ip4.saddr, 4);
-		break;
-	default:
+	droph = droph_lookup(fl, netns, true);
+	if (!droph)
 		return;
-	}
-
-	droph = find_droph(addr, true);
-	if (!droph) {
-		fprintf(stderr, "failed to allocate droph for addr %lx\n",
-			addr);
-		return;
-	}
 
 	droph->total_drops++;
 
