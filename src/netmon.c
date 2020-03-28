@@ -33,8 +33,7 @@
 
 #include "perf_events.c"
 
-static __u64 display_rate = 10 * NSEC_PER_SEC;
-static __u64 t_last_display;
+static __u64 display_rate = 10;
 static bool update_display;
 static unsigned int drop_thresh = 1;
 static unsigned int do_hist;
@@ -891,17 +890,28 @@ static void show_packet(struct data *data, struct ksym_s *sym)
 
 static void process_event(struct data *data)
 {
+	/* nothing to do */
+}
+
+static int handle_bpf_output(void *_data, int size)
+{
+	struct data *data = _data;
 	struct ksym_s *sym;
+
+	if (size < sizeof(*data)) {
+		fprintf(stderr,
+			"Event size %d is less than data size %ld\n",
+			size, sizeof(*data));
+		return LIBBPF_PERF_EVENT_ERROR;
+	}
 
 	switch (data->event_type) {
 	case EVENT_SAMPLE:
 		sym = find_ksym(data->location);
-		if (skip_ovs_upcalls && sym == ovs_sym)
-			return;
-		if (skip_unix && sym->is_unix)
-			return;
-		if (skip_tcp && sym->is_tcp)
-			return;
+		if ((skip_ovs_upcalls && sym == ovs_sym) ||
+		    (skip_unix && sym->is_unix) ||
+		    (skip_tcp && sym->is_tcp))
+			goto out;
 
 		if (do_hist)
 			process_packet(data, sym);
@@ -912,19 +922,17 @@ static void process_event(struct data *data)
 		process_exit(data);
 		break;
 	}
+out:
+	return LIBBPF_PERF_EVENT_CONT;
 }
 
 static int pktdrop_complete(void)
 {
 	process_events();
 
-	if (do_hist) {
-		__u64 t_mono = get_time_ns(CLOCK_MONOTONIC);
-
-		if (t_mono > t_last_display + display_rate) {
-			t_last_display = t_mono;
-			show_hist();
-		}
+	if (do_hist && update_display) {
+		show_hist();
+		update_display = 0;
 	}
 	return done;
 }
@@ -1092,6 +1100,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 
 	if (signal(SIGINT, sig_handler) ||
 	    signal(SIGHUP, sig_handler) ||
+	    signal(SIGALRM, sig_handler) ||
 	    signal(SIGTERM, sig_handler)) {
 		perror("signal");
 		return 1;
@@ -1103,11 +1112,10 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	if (configure_perf_event_channel(obj, nevents))
 		return 1;
 
-	if (do_hist)
-		t_last_display = get_time_ns(CLOCK_MONOTONIC);
+	alarm(display_rate);
 
 	/* main event loop */
-	return perf_event_loop(NULL, NULL, pktdrop_complete);
+	return perf_event_loop(handle_bpf_output, NULL, pktdrop_complete);
 }
 
 static unsigned int pktcnt;
