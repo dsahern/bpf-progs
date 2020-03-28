@@ -46,16 +46,18 @@ static void dump_buckets(__u64 *buckets, __u64 *prev_buckets)
 	}
 
 	printf("%s: ", timestamp(buf, sizeof(buf), 0));
-	printf("errors: %llu\n", diff[8]);
-	printf("        time (usec)        count\n");
-	printf("        0   - %6u:   %'8llu\n", NET_RX_BUCKET_0, diff[0]);
-	printf("   %6u+  - %6u:   %'8llu\n", NET_RX_BUCKET_0, NET_RX_BUCKET_1, diff[1]);
-	printf("   %6u+  - %6u:   %'8llu\n", NET_RX_BUCKET_1, NET_RX_BUCKET_2, diff[2]);
-	printf("   %6u+  - %6u:   %'8llu\n", NET_RX_BUCKET_2, NET_RX_BUCKET_3, diff[3]);
-	printf("   %6u+  - %6u:   %'8llu\n", NET_RX_BUCKET_3, NET_RX_BUCKET_4, diff[4]);
-	printf("   %6u+  - %6u:   %'8llu\n", NET_RX_BUCKET_4, NET_RX_BUCKET_5, diff[5]);
-	printf("   %6u+  - %6u:   %'8llu\n", NET_RX_BUCKET_5, NET_RX_BUCKET_6, diff[6]);
-	printf("   %6u+  -     up:   %'8llu\n", NET_RX_BUCKET_5, diff[7]);
+	printf("errors: %llu\n", diff[NET_RX_ERR_BKT]);
+	printf("          time (usec)        count\n");
+	printf("         0   - %7u:   %'8llu\n", NET_RX_BUCKET_0, diff[0]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_0, NET_RX_BUCKET_1, diff[1]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_1, NET_RX_BUCKET_2, diff[2]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_2, NET_RX_BUCKET_3, diff[3]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_3, NET_RX_BUCKET_4, diff[4]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_4, NET_RX_BUCKET_5, diff[5]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_5, NET_RX_BUCKET_6, diff[6]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_6, NET_RX_BUCKET_7, diff[7]);
+	printf("   %7u+  - %7u:   %'8llu\n", NET_RX_BUCKET_7, NET_RX_BUCKET_8, diff[8]);
+	printf("   %7u+  -      up:   %'8llu\n", NET_RX_BUCKET_8, diff[9]);
 }
 
 static int net_rx_dump_hist(int hist_map_fd)

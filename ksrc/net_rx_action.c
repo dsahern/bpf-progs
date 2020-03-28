@@ -22,7 +22,7 @@ struct bpf_map_def SEC("maps") net_rx_map = {
 
 struct net_rx_enter {
 	u64 t_enter;
-	u32 cpu;
+	int cpu;
 };
 
 struct bpf_map_def SEC("maps") net_rx_enter_map = {
@@ -36,12 +36,27 @@ SEC("kprobe/net_rx_action")
 int bpf_net_rx_kprobe(struct pt_regs *ctx)
 {
 	struct net_rx_enter *e;
+	bool inc_error = false;
 	u32 idx = 0;
 
 	e = bpf_map_lookup_elem(&net_rx_enter_map, &idx);
 	if (e) {
+		if (e->t_enter || e->cpu != -1)
+			inc_error = true;
+
 		e->t_enter = bpf_ktime_get_ns();
 		e->cpu = bpf_get_smp_processor_id();
+	} else {
+		inc_error = true;
+	}
+
+	if (inc_error) {
+		struct net_rx_hist_val *hist;
+		u32 idx = 0;
+
+		hist = bpf_map_lookup_elem(&net_rx_map, &idx);
+		if (hist)
+			__sync_fetch_and_add(&hist->buckets[NET_RX_ERR_BKT], 1);
 	}
 
 	return 0;
@@ -62,8 +77,8 @@ int bpf_net_rx_kprobe_ret(struct pt_regs *ctx)
 	if (!hist)
 		goto out;
 
-	if (e->cpu != bpf_get_smp_processor_id()) {
-		__sync_fetch_and_add(&hist->buckets[8], 1);
+	if (e->cpu != bpf_get_smp_processor_id() || !e->t_enter) {
+		__sync_fetch_and_add(&hist->buckets[NET_RX_ERR_BKT], 1);
 		goto out;
 	}
 
@@ -87,14 +102,18 @@ int bpf_net_rx_kprobe_ret(struct pt_regs *ctx)
 			c = &hist->buckets[5];
 		else if (dt <= NET_RX_BUCKET_6)
 			c = &hist->buckets[6];
-		else
+		else if (dt <= NET_RX_BUCKET_7)
 			c = &hist->buckets[7];
+		else if (dt <= NET_RX_BUCKET_8)
+			c = &hist->buckets[8];
+		else
+			c = &hist->buckets[9];
 
 		__sync_fetch_and_add(c, 1);
 	}
 out:
 	e->t_enter = 0;
-	e->cpu = 0;
+	e->cpu = -1;
 	return 0;
 }
 
