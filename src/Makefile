@@ -9,6 +9,7 @@ MODS += $(OBJDIR)opensnoop
 MODS += $(OBJDIR)netmon
 MODS += $(OBJDIR)pktlatency
 MODS += $(OBJDIR)ovslatency
+MODS += $(OBJDIR)net_rx_action
 
 MODS += $(OBJDIR)xdp_dummy
 
