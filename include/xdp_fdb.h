@@ -11,8 +11,8 @@ struct xdp_stats {
 
 struct mac_key
 {
-	u8  mac[ETH_ALEN];
-	u16 vlan;
+	__u8  mac[ETH_ALEN];
+	__u16 vlan;
 };
 
 #endif
