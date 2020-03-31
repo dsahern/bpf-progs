@@ -439,11 +439,11 @@ static int tp_event_id(const char *event, bool probe)
 	char buf[64] = {};
 
 	if (probe)
-		snprintf(filename, sizeof(filename),
-			 "/sys/kernel/debug/tracing/events/probe/%s/id", event);
+		snprintf(filename, sizeof(filename), "%s/events/probe/%s/id",
+			 tracingfs, event);
 	else
-		snprintf(filename, sizeof(filename),
-			 "/sys/kernel/debug/tracing/events/%s/id", event);
+		snprintf(filename, sizeof(filename), "%s/events/%s/id",
+			 tracingfs, event);
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
