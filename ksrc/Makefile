@@ -48,7 +48,8 @@ CFLAGS += -Wno-address-of-packed-member
 CFLAGS += -Wno-tautological-compare 
 CFLAGS += -Wno-unknown-warning-option
 
-INCLUDES  = -I$(LIBBPF_PATH)/usr/include
+INCLUDES  = -I../include
+INCLUDES += -I$(LIBBPF_PATH)/usr/include
 INCLUDES += -I$(KDIR)/arch/x86/include
 INCLUDES += -I$(BDIR)/arch/x86/include/generated
 INCLUDES += -I$(BDIR)/include 
@@ -57,7 +58,6 @@ INCLUDES += -I$(KDIR)/arch/x86/include/uapi
 INCLUDES += -I$(BDIR)/arch/x86/include/generated/uapi 
 INCLUDES += -I$(KDIR)/include/uapi 
 INCLUDES += -I$(BDIR)/include/generated/uapi 
-INCLUDES += -I../include
 
 SINCLUDES  = -include $(KDIR)/include/linux/kconfig.h
 SINCLUDES += -include include/asm_goto_workaround.h
