@@ -22,6 +22,7 @@ endif
 OBJDIR = obj/
 
 MODS += $(OBJDIR)execsnoop.o
+MODS += $(OBJDIR)execsnoop_legacy.o
 MODS += $(OBJDIR)opensnoop.o
 
 MODS += $(OBJDIR)pktdrop.o

@@ -208,25 +208,34 @@ static void process_event(struct data *data)
 	/* nothing to do */
 }
 
-static int do_execve_kprobes(struct bpf_object *obj)
+static int fd_exec = -1, fd_exec_ret = -1;
+
+static int do_execve_kprobes(struct bpf_object *obj, int attr_type)
 {
 	struct bpf_program *prog;
-	int prog_fd, fd;
+	int prog_fd;
 
 	/*
 	 * create kprobe on __x64_sys_execve and install bpf program
 	 */
 	prog = bpf_object__find_program_by_title(obj, "kprobe/execve");
 	if (!prog) {
-		printf("Failed to get prog in obj file\n");
+		printf("Failed to find kprobe/execve prog in obj file\n");
 		return 1;
 	}
-
 	prog_fd = bpf_program__fd(prog);
-	fd = kprobe_perf_event(prog_fd, "__x64_sys_execve", 0, 0);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to create probe on __x64_sys_execve: %d %s\n",
-			fd, strerror(errno));
+
+	if (attr_type < 0) {
+		fd_exec = kprobe_perf_event_legacy(prog_fd, "sys_execve",
+						   false, false);
+	} else {
+		fd_exec = kprobe_perf_event(prog_fd, "__x64_sys_execve",
+					    false, attr_type);
+	}
+	if (fd_exec < 0) {
+		fprintf(stderr,
+			"Failed to create sys_execve probe: %d %s\n",
+			fd_exec, strerror(errno));
 		return 1;
 	}
 
@@ -234,17 +243,40 @@ static int do_execve_kprobes(struct bpf_object *obj)
 	 * create return kprobe on __x64_sys_execve and install bpf program
 	 */
 	prog = bpf_object__find_program_by_title(obj, "kprobe/execve_ret");
-	if (prog) {
-		prog_fd = bpf_program__fd(prog);
-		fd = kprobe_perf_event(prog_fd, "__x64_sys_execve", 0, 1);
-		if (fd < 0) {
-			fprintf(stderr, "Failed to create return probe on __x64_sys_execve: %d %s\n",
-				fd, strerror(errno));
-			return 1;
-		}
+	if (!prog) {
+		printf("Failed to find kprobe/execve_ret prog in obj file\n");
+		return 1;
+	}
+	prog_fd = bpf_program__fd(prog);
+
+
+	if (attr_type < 0) {
+		fd_exec_ret = kprobe_perf_event_legacy(prog_fd, "sys_execve",
+						       true, false);
+	} else {
+		fd_exec_ret = kprobe_perf_event(prog_fd, "__x64_sys_execve",
+						true, attr_type);
+	}
+	if (fd_exec_ret < 0) {
+		fprintf(stderr,
+			"Failed to create return probe on sys_execve: %d %s\n",
+			fd_exec_ret, strerror(errno));
+		return 1;
 	}
 
 	return 0;
+}
+
+static void execve_kprobes_delete(void)
+{
+	if (fd_exec >= 0) {
+		close(fd_exec);
+		kprobe_event_delete("sys_execve", false);
+	}
+	if (fd_exec_ret >= 0) {
+		close(fd_exec_ret);
+		kprobe_event_delete("sys_execve", true);
+	}
 }
 
 static int execsnoop_complete(void)
@@ -271,16 +303,21 @@ static void print_usage(char *prog)
 
 int main(int argc, char **argv)
 {
-	char *objfile = "execsnoop.o";
 	struct bpf_prog_load_attr prog_load_attr = {};
 	const char *tps[] = {
 		"sched/sched_process_exit",
 		NULL
 	};
+	char *objfile = "execsnoop.o";
 	bool filename_set = false;
 	struct bpf_object *obj;
 	int nevents = 100;
+	int attr_type;
 	int rc;
+
+	attr_type = kprobe_event_type();
+	if (attr_type < 0)
+		objfile = "execsnoop_legacy.o";
 
 	while ((rc = getopt(argc, argv, "f:TDA")) != -1)
 	{
@@ -310,7 +347,7 @@ int main(int argc, char **argv)
 	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
 
-	if (do_execve_kprobes(obj) || do_tracepoint(obj, tps))
+	if (do_execve_kprobes(obj, attr_type) || do_tracepoint(obj, tps))
 		return 1;
 
 	if (signal(SIGINT, sig_handler) ||
@@ -329,5 +366,10 @@ int main(int argc, char **argv)
 	print_header();
 
 	/* main event loop */
-	return perf_event_loop(print_bpf_output, NULL, execsnoop_complete);
+	rc = perf_event_loop(print_bpf_output, NULL, execsnoop_complete);
+
+	close_perf_event_channel();
+	execve_kprobes_delete();
+
+	return rc;
 }

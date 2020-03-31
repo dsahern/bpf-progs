@@ -51,6 +51,8 @@ int load_obj_file(struct bpf_prog_load_attr *attr,
 		}
 		++i;
 	}
+
+	fprintf(stderr, "Failed to find object file; nothing to load\n");
 	return 1;
 }
 
