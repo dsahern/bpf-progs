@@ -5,6 +5,7 @@
  */
 #include <linux/bpf.h>
 #include <ctype.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +24,8 @@ struct data {
 	__u64 time;
 	__u32 cpu;
 };
+
+static bool done;
 
 #include "perf_events.c"
 
@@ -78,6 +81,12 @@ static int net_rx_dump_hist(int hist_map_fd)
 	return 0;
 }
 
+static void sig_handler(int signo)
+{
+	printf("Terminating by signal %d\n", signo);
+	done = true;
+}
+
 static void print_usage(char *prog)
 {
 	printf(
@@ -92,9 +101,9 @@ int main(int argc, char **argv)
 	struct bpf_prog_load_attr prog_load_attr = { };
 	struct net_rx_hist_val hist2 = {};
 	char *objfile = "net_rx_action.o";
-	const char *probes[] = {
-		"net_rx_action",
-		NULL,
+	struct kprobe_data probes[] = {
+		{ .func = "net_rx_action", .fd = -1 },
+		{ .func = "net_rx_action", .fd = -1, .retprobe = true },
 	};
 	bool filename_set = false;
 	struct bpf_object *obj;
@@ -125,10 +134,18 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (signal(SIGINT, sig_handler) ||
+	    signal(SIGHUP, sig_handler) ||
+	    signal(SIGTERM, sig_handler)) {
+		perror("signal");
 		return 1;
+	}
 
-	if (do_kprobe(obj, probes, 0) || do_kprobe(obj, probes, 1))
+	setlinebuf(stdout);
+	setlinebuf(stderr);
+	setlocale(LC_NUMERIC, "en_US.utf-8");
+
+	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
 
 	map = bpf_object__find_map_by_name(obj, "net_rx_map");
@@ -141,15 +158,18 @@ int main(int argc, char **argv)
 	/* make sure index 0 entry exists */
 	bpf_map_update_elem(hist_map_fd, &idx, &hist2, BPF_ANY);
 
-	setlinebuf(stdout);
-	setlinebuf(stderr);
-	setlocale(LC_NUMERIC, "en_US.utf-8");
+	rc = 1;
+	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
+		goto out;
 
-	while(1) {
+	rc = 0;
+	while (!done) {
 		sleep(display_rate);
 		if (net_rx_dump_hist(hist_map_fd))
 			break;
 	}
+out:
+	kprobe_cleanup(probes, ARRAY_SIZE(probes));
 
-	return 0;
+	return rc;
 }

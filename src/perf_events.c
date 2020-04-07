@@ -561,7 +561,7 @@ static int do_kprobe_event(const char *event)
 }
 
 static int kprobe_perf_event_legacy(int prog_fd, const char *func,
-				    bool retprobe, bool delete)
+				    bool retprobe)
 {
 	char event[128], pname[64];
 	char t = 'p';
@@ -580,7 +580,7 @@ static int kprobe_perf_event_legacy(int prog_fd, const char *func,
 	 *  delete:  -:kprobes/<p>_<func>_<pid>
 	 */
 	snprintf(pname, sizeof(pname), "%c_%s_%d", t, func, getpid());
-	if (delete)
+	if (prog_fd < 0)
 		snprintf(event, sizeof(event), "-:kprobes/%s", pname);
 	else
 		snprintf(event, sizeof(event), "%c:kprobes/%s %s", t, pname, func);
@@ -588,7 +588,7 @@ static int kprobe_perf_event_legacy(int prog_fd, const char *func,
 	if (do_kprobe_event(event))
 		return -1;
 
-	if (delete)
+	if (prog_fd < 0)
 		return 0;
 
 	id = kprobes_event_id(pname);
@@ -670,53 +670,73 @@ int kprobe_perf_event(int prog_fd, const char *func, int retprobe,
  * If retprobe is set, bpf program name is expected to be
  * "kprobe/%s_ret"
  */
-int do_kprobe(struct bpf_object *obj, const char *probes[], int retprobe)
+int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
+		unsigned int count)
 {
 	struct bpf_program *prog;
-	int prog_fd, fd;
-	int attr_type;
-	int i;
+	int prog_fd, attr_type;
+	unsigned int i;
+	int rc = 0;
 
 	attr_type = kprobe_event_type();
 
-	for (i = 0; probes[i]; ++i) {
-		const char *func = probes[i];
+	for (i = 0; i < count; ++i) {
 		char buf[256];
 
-		snprintf(buf, sizeof(buf), "kprobe/%s%s",
-			 probes[i], retprobe ? "_ret" : "");
+		if (probes[i].prog) {
+			snprintf(buf, sizeof(buf), "%s", probes[i].prog);
+		} else {
+			snprintf(buf, sizeof(buf), "kprobe/%s%s",
+				 probes[i].func,
+				 probes[i].retprobe ? "_ret" : "");
+		}
 
 		prog = bpf_object__find_program_by_title(obj, buf);
 		if (!prog) {
 			printf("Failed to get prog in obj file\n");
-			return 1;
+			rc = 1;
+			continue;
 		}
 		prog_fd = bpf_program__fd(prog);
 
 
-		if (attr_type < 0)
-			fd = kprobe_perf_event_legacy(prog_fd, func,
-						      retprobe, false);
-		else
-			fd = kprobe_perf_event(prog_fd, func, retprobe,
-					       attr_type);
-		if (fd < 0) {
+		if (attr_type < 0) {
+			probes[i].fd = kprobe_perf_event_legacy(prog_fd,
+								probes[i].func,
+								probes[i].retprobe);
+		} else {
+			probes[i].fd = kprobe_perf_event(prog_fd,
+							 probes[i].func,
+							 probes[i].retprobe,
+							 attr_type);
+		}
+		if (probes[i].fd < 0) {
 			fprintf(stderr,
-				"Failed to create perf_event on %s\n", func);
-			return 1;
+				"Failed to create perf_event on %s\n",
+				probes[i].func);
+			rc = 1;
 		}
 	}
 
-	return 0;
+	return rc;
 }
 
-void kprobe_event_delete(const char *func, bool retprobe)
+void kprobe_cleanup(struct kprobe_data *probes, unsigned int count)
 {
+	unsigned int i;
 	int attr_type;
 
 	attr_type = kprobe_event_type();
-	if (attr_type < 0)
-		kprobe_perf_event_legacy(-1, func, retprobe, true);
+	for (i = 0; i < count; ++i) {
+		if (probes[i].fd < 0)
+			continue;
+
+		close(probes[i].fd);
+		if (attr_type < 0) {
+			kprobe_perf_event_legacy(-1, probes[i].func,
+						 probes[i].retprobe);
+		}
+	}
 }
 
 static int syscall_event_id(const char *name)

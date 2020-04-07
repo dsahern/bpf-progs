@@ -18,6 +18,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>
+#include <locale.h>
 #define PCAP_DONT_INCLUDE_PCAP_BPF_H
 #include <pcap.h>
 
@@ -1002,9 +1003,8 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	bool skip_kprobe_err = false;
 	char *objfile = "pktdrop.o";
 	bool filename_set = false;
-	const char *probes[] = {
-		"fib_net_exit",
-		NULL,
+	struct kprobe_data probes[] = {
+		{ .func = "fib_net_exit", .fd = -1 },
 	};
 	const char *tps[] = {
 		"skb/kfree_skb",
@@ -1075,6 +1075,14 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	if (set_reftime())
 		return 1;
 
+	if (signal(SIGINT, sig_handler) ||
+	    signal(SIGHUP, sig_handler) ||
+	    signal(SIGALRM, sig_handler) ||
+	    signal(SIGTERM, sig_handler)) {
+		perror("signal");
+		return 1;
+	}
+
 	if (load_ksyms(kallsyms))
 		return 1;
 
@@ -1091,32 +1099,27 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	if (do_tracepoint(obj, tps))
 		return 1;
 
+	rc = 1;
 	switch(do_hist) {
 	case HIST_BY_NETNS:
-		if (do_kprobe(obj, probes, 0) && !skip_kprobe_err)
-			return 1;
+		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)) &&
+		    !skip_kprobe_err)
+			goto out;
 		break;
 	}
 
-	if (signal(SIGINT, sig_handler) ||
-	    signal(SIGHUP, sig_handler) ||
-	    signal(SIGALRM, sig_handler) ||
-	    signal(SIGTERM, sig_handler)) {
-		perror("signal");
-		return 1;
-	}
-
-	setlinebuf(stdout);
-	setlinebuf(stderr);
-
 	if (configure_perf_event_channel(obj, nevents))
-		return 1;
+		goto out;
 
 	if (do_hist)
 		alarm(display_rate);
 
 	/* main event loop */
-	return perf_event_loop(handle_bpf_output, NULL, pktdrop_complete);
+	rc = perf_event_loop(handle_bpf_output, NULL, pktdrop_complete);
+out:
+	close_perf_event_channel();
+	kprobe_cleanup(probes, ARRAY_SIZE(probes));
+	return rc;
 }
 
 static unsigned int pktcnt;
@@ -1309,9 +1312,6 @@ static int pcap_analysis(const char *prog, int argc, char **argv)
 		return 1;
 	}
 
-	setlinebuf(stdout);
-	setlinebuf(stderr);
-
 	return handle_pcap(file, dev);
 }
 
@@ -1344,6 +1344,10 @@ int main(int argc, char **argv)
 		print_main_usage(prog);
 		return 0;
 	}
+
+	setlinebuf(stdout);
+	setlinebuf(stderr);
+	setlocale(LC_NUMERIC, "en_US.utf-8");
 
 	argc--;
 	argv++;

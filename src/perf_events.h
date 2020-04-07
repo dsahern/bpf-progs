@@ -5,6 +5,17 @@
 #include <linux/perf_event.h>
 #include <bpf/libbpf.h>
 
+struct kprobe_data {
+	const char *prog;
+	const char *func;
+	int fd;
+	bool retprobe;
+};
+
+int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
+		unsigned int count);
+void kprobe_cleanup(struct kprobe_data *probes, unsigned int count);
+
 typedef enum bpf_perf_event_ret (*perf_event_print_fn)(void *data, int size);
 
 /* attach channel map to perf */

@@ -12,7 +12,7 @@
 #include <net/if.h>
 #include <signal.h>
 #include <errno.h>
-#include <assert.h>
+#include <locale.h>
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -152,12 +152,13 @@ int main(int argc, char **argv)
 	};
 	char *objfile = "opensnoop.o";
 	bool filename_set = false;
-	const char *probes[] = {
-		"do_sys_open",
-		NULL
+	struct kprobe_data probes[] = {
+		{ .func = "do_sys_open", .fd = -1 },
+		{ .func = "do_sys_open", .fd = -1, .retprobe = true },
 	};
 	struct bpf_object *obj;
 	int nevents = 1000;
+	int rc;
 
 	if (argc > 1) {
 		objfile = argv[1];
@@ -176,18 +177,25 @@ int main(int argc, char **argv)
 
 	setlinebuf(stdout);
 	setlinebuf(stderr);
+	setlocale(LC_NUMERIC, "en_US.utf-8");
 
 	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
 
-	if (do_kprobe(obj, probes, 0) || do_kprobe(obj, probes, 1))
-		return 1;
+	rc = 1;
+	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
+		goto out;
 
 	if (configure_perf_event_channel(obj, nevents))
-		return 1;
+		goto out;
 
 	print_header();
 
 	/* main event loop */
-	return perf_event_loop(print_bpf_output, NULL, opensnoop_complete);
+	rc = perf_event_loop(print_bpf_output, NULL, opensnoop_complete);
+out:
+	close_perf_event_channel();
+	kprobe_cleanup(probes, ARRAY_SIZE(probes));
+
+	return rc;
 }

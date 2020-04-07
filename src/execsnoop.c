@@ -208,77 +208,6 @@ static void process_event(struct data *data)
 	/* nothing to do */
 }
 
-static int fd_exec = -1, fd_exec_ret = -1;
-
-static int do_execve_kprobes(struct bpf_object *obj, int attr_type)
-{
-	struct bpf_program *prog;
-	int prog_fd;
-
-	/*
-	 * create kprobe on __x64_sys_execve and install bpf program
-	 */
-	prog = bpf_object__find_program_by_title(obj, "kprobe/execve");
-	if (!prog) {
-		printf("Failed to find kprobe/execve prog in obj file\n");
-		return 1;
-	}
-	prog_fd = bpf_program__fd(prog);
-
-	if (attr_type < 0) {
-		fd_exec = kprobe_perf_event_legacy(prog_fd, "sys_execve",
-						   false, false);
-	} else {
-		fd_exec = kprobe_perf_event(prog_fd, "__x64_sys_execve",
-					    false, attr_type);
-	}
-	if (fd_exec < 0) {
-		fprintf(stderr,
-			"Failed to create sys_execve probe: %d %s\n",
-			fd_exec, strerror(errno));
-		return 1;
-	}
-
-	/*
-	 * create return kprobe on __x64_sys_execve and install bpf program
-	 */
-	prog = bpf_object__find_program_by_title(obj, "kprobe/execve_ret");
-	if (!prog) {
-		printf("Failed to find kprobe/execve_ret prog in obj file\n");
-		return 1;
-	}
-	prog_fd = bpf_program__fd(prog);
-
-
-	if (attr_type < 0) {
-		fd_exec_ret = kprobe_perf_event_legacy(prog_fd, "sys_execve",
-						       true, false);
-	} else {
-		fd_exec_ret = kprobe_perf_event(prog_fd, "__x64_sys_execve",
-						true, attr_type);
-	}
-	if (fd_exec_ret < 0) {
-		fprintf(stderr,
-			"Failed to create return probe on sys_execve: %d %s\n",
-			fd_exec_ret, strerror(errno));
-		return 1;
-	}
-
-	return 0;
-}
-
-static void execve_kprobes_delete(void)
-{
-	if (fd_exec >= 0) {
-		close(fd_exec);
-		kprobe_event_delete("sys_execve", false);
-	}
-	if (fd_exec_ret >= 0) {
-		close(fd_exec_ret);
-		kprobe_event_delete("sys_execve", true);
-	}
-}
-
 static int execsnoop_complete(void)
 {
 	return done;
@@ -304,6 +233,12 @@ static void print_usage(char *prog)
 int main(int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = {};
+	struct kprobe_data probes[] = {
+		{ .prog = "kprobe/execve",     .func = "__x64_sys_execve",
+		  .fd = -1 },
+		{ .prog = "kprobe/execve_ret", .func = "__x64_sys_execve",
+		  .fd = -1, .retprobe = true },
+	};
 	const char *tps[] = {
 		"sched/sched_process_exit",
 		NULL
@@ -316,8 +251,12 @@ int main(int argc, char **argv)
 	int rc;
 
 	attr_type = kprobe_event_type();
-	if (attr_type < 0)
+	if (attr_type < 0) {
+		/* SWAG - allows execsnoop to work on 4.14 and 5.4 */
+		probes[0].func = "sys_execve";
+		probes[1].func = "sys_execve";
 		objfile = "execsnoop_legacy.o";
+	}
 
 	while ((rc = getopt(argc, argv, "f:TDA")) != -1)
 	{
@@ -344,12 +283,6 @@ int main(int argc, char **argv)
 	if (set_reftime())
 		return 1;
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
-		return 1;
-
-	if (do_execve_kprobes(obj, attr_type) || do_tracepoint(obj, tps))
-		return 1;
-
 	if (signal(SIGINT, sig_handler) ||
 	    signal(SIGHUP, sig_handler) ||
 	    signal(SIGTERM, sig_handler)) {
@@ -360,16 +293,24 @@ int main(int argc, char **argv)
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	if (configure_perf_event_channel(obj, nevents))
+	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
+
+	rc = 1;
+	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)) ||
+	    do_tracepoint(obj, tps))
+		goto out;
+
+	if (configure_perf_event_channel(obj, nevents))
+		goto out;
 
 	print_header();
 
 	/* main event loop */
 	rc = perf_event_loop(print_bpf_output, NULL, execsnoop_complete);
-
+out:
 	close_perf_event_channel();
-	execve_kprobes_delete();
+	kprobe_cleanup(probes, ARRAY_SIZE(probes));
 
 	return rc;
 }

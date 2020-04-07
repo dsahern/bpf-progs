@@ -15,6 +15,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>
+#include <locale.h>
 
 #include <bpf/bpf.h>
 
@@ -480,6 +481,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	setlinebuf(stdout);
+	setlinebuf(stderr);
+	setlocale(LC_NUMERIC, "en_US.utf-8");
+
 	if (set_reftime())
 		return 1;
 
@@ -520,9 +525,6 @@ int main(int argc, char **argv)
 		perror("signal");
 		return 1;
 	}
-
-	setlinebuf(stdout);
-	setlinebuf(stderr);
 
 	if (configure_perf_event_channel(obj, nevents))
 		return 1;
