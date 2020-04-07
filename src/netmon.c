@@ -1043,7 +1043,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 				fprintf(stderr, "Invalid display rate\n");
 				return 1;
 			}
-			display_rate = r * NSEC_PER_SEC;
+			display_rate = r;
 			break;
 		case 's':
 			if (check_sort_arg(optarg))
@@ -1112,7 +1112,8 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	if (configure_perf_event_channel(obj, nevents))
 		return 1;
 
-	alarm(display_rate);
+	if (do_hist)
+		alarm(display_rate);
 
 	/* main event loop */
 	return perf_event_loop(handle_bpf_output, NULL, pktdrop_complete);
@@ -1234,8 +1235,6 @@ static int pcap_analysis(const char *prog, int argc, char **argv)
 	const char *dev = NULL;
 	int rc, r;
 
-	display_rate /= NSEC_PER_SEC;
-
 	while ((rc = getopt(argc, argv, "c:f:hi:l:r:s:t:")) != -1)
 	{
 		switch(rc) {
@@ -1326,7 +1325,7 @@ static const struct {
 
 static void print_main_usage(const char *prog)
 {
-	fprintf(stderr, "usage: %s { drop | pcap }\n", prog);
+	fprintf(stderr, "usage: %s { drop | pcap } [OPTS]\n", prog);
 }
 
 int main(int argc, char **argv)
@@ -1341,7 +1340,7 @@ int main(int argc, char **argv)
 	}
 
 	cmd = argv[1];
-	if (!strcmp(cmd, "help")) {
+	if (!strcmp(cmd, "help") || !strcmp(cmd, "-h")) {
 		print_main_usage(prog);
 		return 0;
 	}
