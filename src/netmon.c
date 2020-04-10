@@ -600,6 +600,8 @@ static void show_hist(void)
 	switch(do_hist) {
 	case HIST_BY_DMAC:
 	case HIST_BY_SMAC:
+		printf("    %16s", "");
+		break;
 	case HIST_BY_DIP:
 	case HIST_BY_SIP:
 		printf("    %32s", "");
@@ -1141,18 +1143,23 @@ static void display_pcap_results(void)
 	case HIST_BY_FLOW:
 	case HIST_BY_FLOW_SRC:
 		show_flow_buckets();
+		goto out;
+	case HIST_BY_DMAC:
+	case HIST_BY_SMAC:
+		printf("    %16s", "");
 		break;
 	default:
 		printf("    %32s", "");
-		for (i = 0; i < HIST_MAX; i++) {
-			if (!hist_desc[i].skip)
-				printf("  %10s", hist_desc[i].str);
-		}
-		printf("  %10s\n", "total");
-
-		show_hist_buckets();
 	}
+	for (i = 0; i < HIST_MAX; i++) {
+		if (!hist_desc[i].skip)
+			printf("  %10s", hist_desc[i].str);
+	}
+	printf("  %10s\n", "total");
 
+	show_hist_buckets();
+
+out:
 	update_display = 0;
 }
 
