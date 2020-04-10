@@ -1186,10 +1186,11 @@ static void packet_handler(u_char *udata, const struct pcap_pkthdr *pkthdr,
 		print_flow(&fl);
 	}
 
-	if (pktcnt && total_pkts >= pktcnt) {
-		pcap_breakloop(ph);
+	if (pktcnt && total_pkts >= pktcnt)
 		done = 1;
-	}
+
+	if (done)
+		pcap_breakloop(ph);
 }
 
 static int handle_pcap(const char *file, const char *dev)
