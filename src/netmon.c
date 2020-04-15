@@ -986,7 +986,6 @@ static void print_dropmon_usage(const char *prog)
 	printf(
 	"usage: %s OPTS\n\n"
 	"	-f bpf-file    bpf filename to load\n"
-	"	-i             ignore kprobe error (4.14 can not install kprobe on fib_net_exit)\n"
 	"	-k kallsyms    load kernel symbols from this file\n"
 	"	-m count       set number of pages in perf buffers\n"
 	"	-O             ignore ovs upcalls\n"
@@ -1002,7 +1001,6 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = { };
 	const char *kallsyms = "/proc/kallsyms";
-	bool skip_kprobe_err = false;
 	char *objfile = "pktdrop.o";
 	bool filename_set = false;
 	struct kprobe_data probes[] = {
@@ -1017,15 +1015,12 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	int pg_cnt = 0;
 	int rc, r;
 
-	while ((rc = getopt(argc, argv, "f:ik:m:Or:s:t:TU")) != -1)
+	while ((rc = getopt(argc, argv, "f:k:m:Or:s:t:TU")) != -1)
 	{
 		switch(rc) {
 		case 'f':
 			objfile = optarg;
 			filename_set = true;
-			break;
-		case 'i':
-			skip_kprobe_err = true;
 			break;
 		case 'k':
 			kallsyms = optarg;
@@ -1104,8 +1099,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	rc = 1;
 	switch(do_hist) {
 	case HIST_BY_NETNS:
-		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)) &&
-		    !skip_kprobe_err)
+		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 			goto out;
 		break;
 	}
