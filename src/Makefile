@@ -25,6 +25,10 @@ INCLUDES += -I../include/tools
 ifneq (,$(LIBBPF_PATH))
 LIBBPF=$(LIBBPF_PATH)/usr/lib64/libbpf.a
 INCLUDES += -I$(LIBBPF_PATH)/usr/include
+BPF_LINK_FEAT := $(shell egrep 'bpf_link_create' $(LIBBPF_PATH)/usr/include/bpf/libbpf.h)
+ifneq (,$(BPF_LINK_FEAT))
+CFLAGS += -DHAVE_BPF_LINK_CREATE
+endif
 else
 LIBBPF=-lbpf
 endif

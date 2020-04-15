@@ -58,6 +58,7 @@ static int load_mark_prog(__u32 mark)
 				"GPL", 0, bpf_log_buf, sizeof(bpf_log_buf));
 }
 
+#ifdef HAVE_BPF_LINK_CREATE
 static bool done;
 
 static void sig_handler(int signo)
@@ -65,6 +66,7 @@ static void sig_handler(int signo)
 	printf("Terminating by signal %d\n", signo);
 	done = true;
 }
+#endif
 
 static void usage(const char *prog)
 {
@@ -101,6 +103,7 @@ static int load_prog(int ifindex, __u32 mark)
 static int do_bpf_link(int cg_fd, const char *path, int ifindex, __u32 mark,
 		       __u32 flags)
 {
+#ifdef HAVE_BPF_LINK_CREATE
 	int prog_fd, link_fd;
 
 	prog_fd = load_prog(ifindex, mark);
@@ -131,6 +134,10 @@ static int do_bpf_link(int cg_fd, const char *path, int ifindex, __u32 mark,
 	close(link_fd);
 
 	return 0;
+#else
+	fprintf(stderr, "libbpf does not suppport bpf_link_create\n");
+	return 1;
+#endif
 }
 
 static int do_prog(int cg_fd, const char *path, int ifindex, __u32 mark,
