@@ -42,6 +42,7 @@ static const char *hist_sort;
 static unsigned int nsid;
 static struct ksym_s *ovs_sym;
 static bool skip_ovs_upcalls;
+static bool only_ovs_upcalls;
 static bool skip_unix;
 static bool skip_tcp;
 static bool done;
@@ -912,6 +913,7 @@ static int handle_bpf_output(void *_data, int size)
 	case EVENT_SAMPLE:
 		sym = find_ksym(data->location);
 		if ((skip_ovs_upcalls && sym == ovs_sym) ||
+		    (only_ovs_upcalls && sym != ovs_sym) ||
 		    (skip_unix && sym->is_unix) ||
 		    (skip_tcp && sym->is_tcp))
 			goto out;
@@ -988,6 +990,7 @@ static void print_dropmon_usage(const char *prog)
 	"	-f bpf-file    bpf filename to load\n"
 	"	-k kallsyms    load kernel symbols from this file\n"
 	"	-m count       set number of pages in perf buffers\n"
+	"	-o             only track ovs upcalls\n"
 	"	-O             ignore ovs upcalls\n"
 	"	-r rate        display rate (seconds) to dump summary\n"
 	"	-s <type>      show summary by type (netns, dmac, smac, dip, sip, flow, flow-src)\n"
@@ -1015,7 +1018,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	int pg_cnt = 0;
 	int rc, r;
 
-	while ((rc = getopt(argc, argv, "f:k:m:Or:s:t:TU")) != -1)
+	while ((rc = getopt(argc, argv, "f:k:m:oOr:s:t:TU")) != -1)
 	{
 		switch(rc) {
 		case 'f':
@@ -1030,6 +1033,9 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 				fprintf(stderr, "Invalid page count\n");
 				return 1;
 			}
+			break;
+		case 'o':
+			only_ovs_upcalls = true;
 			break;
 		case 'O':
 			skip_ovs_upcalls = true;
@@ -1084,7 +1090,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		return 1;
 
 	ovs_sym = find_ksym_by_name("queue_userspace_packet");
-	if (skip_ovs_upcalls && !ovs_sym) {
+	if ((skip_ovs_upcalls || only_ovs_upcalls) && !ovs_sym) {
 		fprintf(stderr,
 			"Failed to find symbol entry for queue_userspace_packet\n");
 		return 1;
