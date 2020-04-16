@@ -329,11 +329,13 @@ static struct drop_hist *droph_lookup(struct flow *fl, __u64 netns,
 		addr[0] = netns;
 		break;
 	case HIST_BY_DMAC:
+		addr[0] = 0;
 		p8 = (__u8 *)&addr[0];
 		for (i = 0; i < 6; ++i)
 			p8[i] = fl->dmac[5-i];
 		break;
 	case HIST_BY_SMAC:
+		addr[0] = 0;
 		p8 = (__u8 *)&addr[0];
 		for (i = 0; i < 6; ++i)
 			p8[i] = fl->smac[5-i];
