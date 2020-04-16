@@ -122,7 +122,7 @@ int insert_ksym(struct ksym_s *new_sym)
 		new_sym->addr_next = new_sym->addr;
 
 #ifdef KSYM_DEBUG
-	printf("insert_ksym: %s [%s] %lx -> %lx\n",
+	printf("insert_ksym: %s %s %lx -> %lx\n",
 		new_sym->name, new_sym->mod, new_sym->addr, new_sym->addr_next);
 #endif
 	while (*node != NULL) {
@@ -175,7 +175,7 @@ int load_ksyms(const char *file)
 		fprintf(stderr, "ksyms already populated\n");
 		return -1;
 	}
-	
+
 	fp = fopen(file, "r");
 	if (!fp) {
 		fprintf(stderr,
@@ -209,12 +209,9 @@ int load_ksyms(const char *file)
 			continue;
 		}
 
-		sym = NULL;
-
-		/* expect symbol type of 'A' to be at the front of the file */
 		stype = fields[1];
-		if (*stype == 'A' || *stype == 'a')
-			goto next;
+		if (*stype != 'T' && *stype != 't')
+			continue;
 
 		/*
 		 * check for multiple entries with the same address
@@ -238,7 +235,6 @@ int load_ksyms(const char *file)
 			break;
 		}
 
-next:
 		if (prev_sym) {
 			prev_sym->addr_next = addr ? : prev_sym->addr;
 			rc = insert_ksym(prev_sym);
