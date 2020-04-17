@@ -40,6 +40,8 @@ static unsigned int drop_thresh = 1;
 static unsigned int do_hist;
 static const char *hist_sort;
 static unsigned int nsid;
+static unsigned int pktcnt;
+static unsigned int total_pkts;
 static struct ksym_s *ovs_sym;
 static bool skip_ovs_upcalls;
 static bool only_ovs_upcalls;
@@ -920,6 +922,7 @@ static int handle_bpf_output(void *_data, int size)
 		    (skip_tcp && sym->is_tcp))
 			goto out;
 
+		total_pkts++;
 		if (do_hist)
 			process_packet(data, sym);
 		else
@@ -928,6 +931,11 @@ static int handle_bpf_output(void *_data, int size)
 	case EVENT_EXIT:
 		process_exit(data);
 		break;
+	}
+
+	if (pktcnt && total_pkts >= pktcnt) {
+		done = 1;
+		return LIBBPF_PERF_EVENT_DONE;
 	}
 out:
 	return LIBBPF_PERF_EVENT_CONT;
@@ -989,6 +997,7 @@ static void print_dropmon_usage(const char *prog)
 {
 	printf(
 	"usage: %s OPTS\n\n"
+	"	-c count       Number of packets analyze\n"
 	"	-f bpf-file    bpf filename to load\n"
 	"	-k kallsyms    load kernel symbols from this file\n"
 	"	-m count       set number of pages in perf buffers\n"
@@ -1020,9 +1029,16 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	int pg_cnt = 0;
 	int rc, r;
 
-	while ((rc = getopt(argc, argv, "f:k:m:oOr:s:t:TU")) != -1)
+	while ((rc = getopt(argc, argv, "c:f:k:m:oOr:s:t:TU")) != -1)
 	{
 		switch(rc) {
+		case 'c':
+			pktcnt = atoi(optarg);
+			if (!pktcnt) {
+				fprintf(stderr, "Invalid count\n");
+				return 1;
+			}
+			break;
 		case 'f':
 			objfile = optarg;
 			filename_set = true;
@@ -1126,9 +1142,7 @@ out:
 	return rc;
 }
 
-static unsigned int pktcnt;
 static int snaplen = 100;
-static unsigned int total_pkts = 0;
 static pcap_t *ph;
 
 static void display_pcap_results(void)
