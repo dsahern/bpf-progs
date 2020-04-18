@@ -60,12 +60,12 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	if (vhdr + 1 > data_end)
 		return XDP_DROP; // malformed packet
 
-	memset(&key, 0, sizeof(key));
+	__builtin_memset(&key, 0, sizeof(key));
 	key.vlan = ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK;
 	if (key.vlan == 0)
 		return XDP_PASS;
 
-	memcpy(key.mac, eth->h_dest, ETH_ALEN);
+	__builtin_memcpy(key.mac, eth->h_dest, ETH_ALEN);
 
 	entry = bpf_map_lookup_elem(&fdb_map, &key);
 	if (!entry || *entry == 0)
@@ -77,7 +77,7 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 
 	/* remove VLAN header before hand off to VM */
 	h_proto = vhdr->h_vlan_encapsulated_proto;
-	memcpy(smac, eth->h_source, ETH_ALEN);
+	__builtin_memcpy(smac, eth->h_source, ETH_ALEN);
 
 	if (bpf_xdp_adjust_head(ctx, sizeof(*vhdr)))
 		return XDP_PASS;
@@ -89,8 +89,8 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	if (eth + 1 > data_end)
 		return XDP_DROP;
 
-	memcpy(eth->h_dest, key.mac, ETH_ALEN);
-	memcpy(eth->h_source, smac, ETH_ALEN);
+	__builtin_memcpy(eth->h_dest, key.mac, ETH_ALEN);
+	__builtin_memcpy(eth->h_source, smac, ETH_ALEN);
 	eth->h_proto = h_proto;
 
 	return bpf_redirect_map(&xdp_fwd_ports, *entry, 0);
