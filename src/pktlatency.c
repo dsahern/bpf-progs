@@ -180,6 +180,7 @@ static __u64 ptp_mono_ref, ptp_ref;
 static int update_ptp_reftime(void)
 {
 	static clockid_t ptp_clkid = CLOCK_INVALID;
+	__u64 ptp_mono_ref_new, ptp_ref_new, dt_mon, dt_ptp, dt;
 
 	if (ptp_clkid == CLOCK_INVALID) {
 		ptp_clkid = phc_open("/dev/ptp0");
@@ -192,12 +193,24 @@ static int update_ptp_reftime(void)
 	/* PTP clock takes MUCH longer to read (many usec).
 	 * MONOTONIC is fast (< 1 usec)
 	 */
-	ptp_ref = get_time_ns(ptp_clkid);
-	ptp_mono_ref = get_time_ns(CLOCK_MONOTONIC);
-	if (!ptp_ref || !ptp_mono_ref) {
+	ptp_ref_new = get_time_ns(ptp_clkid);
+	ptp_mono_ref_new = get_time_ns(CLOCK_MONOTONIC);
+	if (!ptp_ref_new || !ptp_mono_ref_new || (ptp_ref_new < ptp_ref)) {
 		fprintf(stderr, "Failed to update PTP reference time\n");
 		return 1;
 	}
+
+	/* make sure both clock updates are reasonably sane */
+	if (ptp_ref) {
+		dt_ptp = ptp_ref_new - ptp_ref;
+		dt_mon = ptp_mono_ref_new - ptp_mono_ref;
+		dt = dt_ptp > dt_mon ? dt_ptp - dt_mon : dt_mon - dt_ptp;
+		if (dt > 1 * NSEC_PER_MSEC)
+			return 1;
+	}
+
+	ptp_ref = ptp_ref_new;
+	ptp_mono_ref = ptp_mono_ref_new;
 
 	return 0;
 }
@@ -245,7 +258,7 @@ static void hwtimestamp(__u64 hwtime, __u64 stime)
 		msecs = dt / NSEC_PER_MSEC;
 		dt -= msecs * NSEC_PER_MSEC;
 		usecs = dt / NSEC_PER_USEC;
-		printf(" %2llu.%03llu", msecs, usecs);
+		printf(" %2llu.%03llu ", msecs, usecs);
 	}
 }
 
