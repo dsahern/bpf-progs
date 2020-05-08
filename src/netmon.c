@@ -919,7 +919,8 @@ static int handle_bpf_output(void *_data, int size)
 		if ((skip_ovs_upcalls && sym == ovs_sym) ||
 		    (only_ovs_upcalls && sym != ovs_sym) ||
 		    (skip_unix && sym->is_unix) ||
-		    (skip_tcp && sym->is_tcp))
+		    (skip_tcp && sym->is_tcp &&
+		     data->pkt_type == PACKET_HOST))
 			goto out;
 
 		total_pkts++;
