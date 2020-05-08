@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  *
- * Packet parser for xdp context
+ * Packet parser
  */
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
@@ -14,7 +14,7 @@
 #include <linux/ipv6.h>
 #include <net/ip.h>
 
-#include "xdp_flow.h"
+#include "flow.h"
 
 static __always_inline int parse_icmp6(struct flow *fl, void *nh,
 				       void *data_end)

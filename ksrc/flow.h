@@ -1,5 +1,5 @@
-#ifndef _XDP_FLOW_H_
-#define _XDP_FLOW_H_
+#ifndef _FLOW_H_
+#define _FLOW_H_
 
 struct flow_ports {
 	__be16 sport;
