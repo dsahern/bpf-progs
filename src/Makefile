@@ -33,7 +33,7 @@ endif
 else
 LIBBPF=-lbpf
 endif
-LIBS=$(LIBBPF) -lelf
+LIBS=$(LIBBPF) -lelf -lz
 
 COMMON += $(OBJDIR)timestamps.o
 COMMON += $(OBJDIR)libbpf_helpers.o
