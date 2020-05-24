@@ -16,12 +16,16 @@ struct flow_icmp {
 struct flow {
 	union {
 		__u32		ipv4;
+#ifdef ENABLE_FLOW_IPV6
 		struct in6_addr	ipv6;
+#endif
 	} saddr;
 
 	union {
 		__u32		ipv4;
+#ifdef ENABLE_FLOW_IPV6
 		struct in6_addr ipv6;
+#endif
 	} daddr;
 
 	__u8 family;    /* network address family */

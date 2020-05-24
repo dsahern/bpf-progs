@@ -16,6 +16,7 @@
 
 #include "flow.h"
 
+#ifdef ENABLE_FLOW_IPV6
 static __always_inline int parse_icmp6(struct flow *fl, void *nh,
 				       void *data_end)
 {
@@ -36,6 +37,7 @@ static __always_inline int parse_icmp6(struct flow *fl, void *nh,
 
 	return 0;
 }
+#endif
 
 static __always_inline int parse_icmp(struct flow *fl, void *nh,
 				      void *data_end)
@@ -104,6 +106,7 @@ static __always_inline int parse_transport(struct flow *fl, void *nh,
 	return 1;
 }
 
+#ifdef ENABLE_FLOW_IPV6
 static __always_inline int parse_v6(struct flow *fl, void *nh, void *data_end)
 {
 	struct ipv6hdr *ip6h = nh;
@@ -122,6 +125,7 @@ static __always_inline int parse_v6(struct flow *fl, void *nh, void *data_end)
 	nh += sizeof(*ip6h);
 	return parse_transport(fl, nh, data_end);
 }
+#endif
 
 static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end)
 {
@@ -180,8 +184,10 @@ static __always_inline int parse_pkt(struct flow *fl, __be16 eth_proto,
 
 	if (eth_proto == htons(ETH_P_IP))
 		rc = parse_v4(fl, nh, data_end);
+#ifdef ENABLE_FLOW_IPV6
 	else if (eth_proto == htons(ETH_P_IPV6))
 		rc = parse_v6(fl, nh, data_end);
+#endif
 	else
 		rc = 1;
 
