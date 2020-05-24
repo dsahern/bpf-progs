@@ -145,7 +145,26 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end)
 	}
 
 	nh += (iph->ihl << 2);
-	//nh = iph + 1;
+
+	if (fl->protocol == IPPROTO_IPIP) {
+		iph = nh;
+
+		if (iph + 1 > data_end)
+			return -1;
+
+		if (iph->version != 4 || iph->ihl < 5)
+			return -1;
+
+		fl->inner_saddr = iph->saddr;
+		fl->inner_daddr = iph->daddr;
+		fl->inner_protocol = iph->protocol;
+		if (ntohs(iph->frag_off) & (IP_MF | IP_OFFSET)) {
+			fl->fragment = 1;
+			return 0;
+		}
+
+		nh += (iph->ihl << 2);
+	}
 	return parse_transport(fl, nh, data_end);
 }
 

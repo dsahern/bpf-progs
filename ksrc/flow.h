@@ -24,10 +24,13 @@ struct flow {
 		struct in6_addr ipv6;
 	} daddr;
 
-	__u8 family;    /* address family */
+	__u8 family;    /* network address family */
 	__u8 protocol;  /* L4 protocol */
 	__u8 fragment;
-	__u8 tbd;
+	__u8 inner_protocol;
+
+	__u32 inner_saddr;
+	__u32 inner_daddr;
 
 	union {
 		struct flow_ports ports;
