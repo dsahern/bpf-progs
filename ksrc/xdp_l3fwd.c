@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (c) 2017-18 David Ahern <dsahern@gmail.com>
+/* Example of L3 forwarding via XDP and use of bpf FIB lookup helper.
+ *
+ * Copyright (c) 2017-18 David Ahern <dsahern@gmail.com>
  */
-#define KBUILD_MODNAME "foo"
+#define KBUILD_MODNAME "xdp_l3fwd"
 #include <uapi/linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
