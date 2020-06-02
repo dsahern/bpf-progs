@@ -31,6 +31,7 @@ MODS += $(OBJDIR)ovslatency.o
 MODS += $(OBJDIR)net_rx_action.o
 
 MODS += $(OBJDIR)xdp_l2fwd.o
+MODS += $(OBJDIR)xdp_l3fwd.o
 MODS += $(OBJDIR)xdp_dummy.o
 
 VPATH := .
