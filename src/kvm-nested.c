@@ -89,19 +89,23 @@ int main(int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = { };
 	char *objfile = "kvm-nested.o";
+	struct kprobe_data probes[] = {
+		{ .func = "handle_vmresume", .fd = -1 },
+	};
 	const char *tps[] = {
 		"kvm/kvm_nested_vmexit",
 		"sched/sched_process_exit",
 		NULL
 	};
 	bool filename_set = false;
+	bool use_kprobe = false;
 	struct bpf_object *obj;
 	int display_rate = 10;
 	struct bpf_map *map;
 	int rc, tmp;
 	int map_fd;
 
-	while ((rc = getopt(argc, argv, "f:t:")) != -1)
+	while ((rc = getopt(argc, argv, "f:t:k")) != -1)
 	{
 		switch(rc) {
 		case 'f':
@@ -115,6 +119,9 @@ int main(int argc, char **argv)
 				return 1;
 			}
 			display_rate = tmp;
+			break;
+		case 'k':
+			use_kprobe = true;
 			break;
 		default:
 			print_usage(argv[0]);
@@ -143,8 +150,13 @@ int main(int argc, char **argv)
 	map_fd = bpf_map__fd(map);
 
 	rc = 1;
-	if (do_tracepoint(obj, tps))
-		goto out;
+	if (use_kprobe) {
+		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
+			goto out;
+	} else {
+		if (do_tracepoint(obj, tps))
+			goto out;
+	}
 
 	rc = 0;
 	while (!done) {
@@ -153,6 +165,6 @@ int main(int argc, char **argv)
 			break;
 	}
 
-out:	
+out:
 	return rc;
 }

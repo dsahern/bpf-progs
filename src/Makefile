@@ -6,6 +6,7 @@ OBJDIR = obj/
 MODS += $(OBJDIR)execsnoop
 MODS += $(OBJDIR)opensnoop
 MODS += $(OBJDIR)cgroup_sock
+MODS += $(OBJDIR)kvm-nested
 
 MODS += $(OBJDIR)netmon
 MODS += $(OBJDIR)pktlatency
