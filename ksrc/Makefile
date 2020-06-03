@@ -13,10 +13,13 @@ ifeq ($(BDIR),)
 BDIR=$(shell ../utils/get_path.sh -r $(KVER) -b)
 endif
 
-# requires 4.16 and up; 5.0 for simplicity
-# TO-DO: make a compile time check
-ifneq ($(KMAJ),4)
+XDP_INGRESS_FEAT := $(shell grep ingress_ifindex ../include/uapi/linux/bpf.h)
+ifneq (,$(XDP_INGRESS_FEAT))
 EXTRA_DEFS=-DHAVE_INGRESS_IFINDEX
+endif
+XDP_EGRESS_FEAT := $(shell grep egress_ifindex ../include/uapi/linux/bpf.h)
+ifneq (,$(XDP_EGRESS_FEAT))
+CFLAGS += -DHAVE_EGRESS_IFINDEX
 endif
 
 OBJDIR = obj/
