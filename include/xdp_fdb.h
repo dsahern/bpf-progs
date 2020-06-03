@@ -9,10 +9,18 @@ struct xdp_stats {
 	__u64 dropped;
 };
 
-struct mac_key
+struct fdb_key
 {
 	__u8  mac[ETH_ALEN];
 	__u16 vlan;
+};
+
+struct bpf_devmap_val {
+	__u32 ifindex;
+	union {
+		int fd;
+		__u32 id;
+	} bpf_prog;
 };
 
 #endif

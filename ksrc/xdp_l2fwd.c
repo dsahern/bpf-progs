@@ -17,15 +17,15 @@
 /* For TX-traffic redirect requires net_device ifindex to be in this devmap */
 struct bpf_map_def SEC("maps") xdp_fwd_ports = {
 	.type = BPF_MAP_TYPE_DEVMAP,
-	.key_size = sizeof(int),
-	.value_size = sizeof(int),
+	.key_size = sizeof(u32),
+	.value_size = sizeof(struct bpf_devmap_val),
 	.max_entries = 512,
 };
 
 /* <vlan,dmac> to device index map */
 struct bpf_map_def SEC("maps") fdb_map = {
 	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct mac_key),
+	.key_size = sizeof(struct fdb_key),
 	.value_size = sizeof(u32),
 	.max_entries = 512,
 };
@@ -37,7 +37,7 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	void *data = (void *)(long)ctx->data;
 	struct vlan_hdr *vhdr;
 	struct ethhdr *eth;
-	struct mac_key key;
+	struct fdb_key key;
 	u8 smac[ETH_ALEN];
 	u16 h_proto = 0;
 	u32 *entry;

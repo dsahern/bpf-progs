@@ -3,6 +3,9 @@ include ../config.mk
 
 OBJDIR = obj/
 
+MODS += $(OBJDIR)tcp_probe
+MODS += $(OBJDIR)xdp_l2fwd
+
 MODS += $(OBJDIR)execsnoop
 MODS += $(OBJDIR)opensnoop
 MODS += $(OBJDIR)cgroup_sock
