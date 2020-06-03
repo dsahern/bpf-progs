@@ -65,7 +65,7 @@ static __always_inline int xdp_vlan_pop(struct xdp_md *ctx, __be16 vlan)
 
 	/* expecting a specific vlan tag */
 	if (eth->h_proto != htons(ETH_P_8021Q))
-		return -1;
+		return 1;
 
 	vhdr = data + sizeof(*eth);
 	if (vhdr + 1 > data_end)
