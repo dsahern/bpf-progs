@@ -52,7 +52,7 @@ int str_to_ulong_base(const char *str, unsigned long *ul, int base)
 {
 	char *end;
 
-	*ul= strtoul(str, &end, 16);
+	*ul= strtoul(str, &end, base);
 	if (*end != '\0')
 		return -1;
 
