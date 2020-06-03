@@ -107,7 +107,8 @@ static __always_inline int parse_transport(struct flow *fl, void *nh,
 }
 
 #ifdef ENABLE_FLOW_IPV6
-static __always_inline int parse_v6(struct flow *fl, void *nh, void *data_end)
+static __always_inline int parse_v6(struct flow *fl, void *nh, void *data_end,
+				    unsigned int flags)
 {
 	struct ipv6hdr *ip6h = nh;
 
@@ -122,12 +123,16 @@ static __always_inline int parse_v6(struct flow *fl, void *nh, void *data_end)
 	fl->saddr.ipv6 = ip6h->saddr;
 	fl->daddr.ipv6 = ip6h->daddr;
 
+	if (flags & PARSE_STOP_AT_NET)
+		return 0;
+
 	nh += sizeof(*ip6h);
 	return parse_transport(fl, nh, data_end);
 }
 #endif
 
-static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end)
+static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end,
+				    unsigned int flags)
 {
 	struct iphdr *iph = nh;
 
@@ -147,6 +152,9 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end)
 		fl->fragment = 1;
 		return 0;
 	}
+
+	if (flags & PARSE_STOP_AT_NET)
+		return 0;
 
 	nh += (iph->ihl << 2);
 
@@ -178,15 +186,16 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end)
  * rc == 0: all good
  */
 static __always_inline int parse_pkt(struct flow *fl, __be16 eth_proto,
-				     void *nh, void *data_end)
+				     void *nh, void *data_end,
+				     unsigned int flags)
 {
 	int rc;
 
 	if (eth_proto == htons(ETH_P_IP))
-		rc = parse_v4(fl, nh, data_end);
+		rc = parse_v4(fl, nh, data_end, flags);
 #ifdef ENABLE_FLOW_IPV6
 	else if (eth_proto == htons(ETH_P_IPV6))
-		rc = parse_v6(fl, nh, data_end);
+		rc = parse_v6(fl, nh, data_end, flags);
 #endif
 	else
 		rc = 1;

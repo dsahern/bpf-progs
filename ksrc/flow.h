@@ -1,6 +1,8 @@
 #ifndef _FLOW_H_
 #define _FLOW_H_
 
+#define ENABLE_FLOW_IPV6
+
 struct flow_ports {
 	__be16 sport;
 	__be16 dport;
@@ -42,4 +44,5 @@ struct flow {
 	};
 };
 
+#define PARSE_STOP_AT_NET 0x1
 #endif
