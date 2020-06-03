@@ -4,6 +4,7 @@
 struct bpf_fib_lookup;
 struct bpf_perf_event_data;
 struct bpf_perf_event_value;
+struct bpf_pidns_info;
 struct bpf_sock;
 struct bpf_sock_addr;
 struct bpf_sock_ops;
@@ -17,6 +18,7 @@ struct pt_regs;
 struct sk_reuseport_md;
 struct sockaddr;
 struct tcphdr;
+struct seq_file;
 struct __sk_buff;
 struct sk_msg_md;
 struct xdp_md;
@@ -70,8 +72,8 @@ static int (*bpf_map_delete_elem)(void *map, const void *key) = (void *) 3;
  * 	For tracing programs, safely attempt to read *size* bytes from
  * 	kernel space address *unsafe_ptr* and store the data in *dst*.
  *
- * 	Generally, use bpf_probe_read_user() or bpf_probe_read_kernel()
- * 	instead.
+ * 	Generally, use **bpf_probe_read_user**\ () or
+ * 	**bpf_probe_read_kernel**\ () instead.
  *
  * Returns
  * 	0 on success, or a negative error in case of failure.
@@ -82,6 +84,8 @@ static int (*bpf_probe_read)(void *dst, __u32 size, const void *unsafe_ptr) = (v
  * bpf_ktime_get_ns
  *
  * 	Return the time elapsed since system boot, in nanoseconds.
+ * 	Does not include time the system was suspended.
+ * 	See: **clock_gettime**\ (**CLOCK_MONOTONIC**)
  *
  * Returns
  * 	Current *ktime*.
@@ -576,9 +580,9 @@ static __u64 (*bpf_perf_event_read)(void *map, __u64 flags) = (void *) 22;
  * 	supports redirection to the egress interface, and accepts no
  * 	flag at all.
  *
- * 	The same effect can be attained with the more generic
- * 	**bpf_redirect_map**\ (), which requires specific maps to be
- * 	used but offers better performance.
+ * 	The same effect can also be attained with the more generic
+ * 	**bpf_redirect_map**\ (), which uses a BPF map to store the
+ * 	redirect target instead of providing it directly to the helper.
  *
  * Returns
  * 	For XDP, the helper returns **XDP_REDIRECT** on success or
@@ -1103,11 +1107,11 @@ static int (*bpf_xdp_adjust_head)(struct xdp_md *xdp_md, int delta) = (void *) 4
  * bpf_probe_read_str
  *
  * 	Copy a NUL terminated string from an unsafe kernel address
- * 	*unsafe_ptr* to *dst*. See bpf_probe_read_kernel_str() for
+ * 	*unsafe_ptr* to *dst*. See **bpf_probe_read_kernel_str**\ () for
  * 	more details.
  *
- * 	Generally, use bpf_probe_read_user_str() or bpf_probe_read_kernel_str()
- * 	instead.
+ * 	Generally, use **bpf_probe_read_user_str**\ () or
+ * 	**bpf_probe_read_kernel_str**\ () instead.
  *
  * Returns
  * 	On success, the strictly positive length of the string,
@@ -1166,6 +1170,12 @@ static __u32 (*bpf_set_hash)(struct __sk_buff *skb, __u32 hash) = (void *) 48;
  * 	must be specified, see **setsockopt(2)** for more information.
  * 	The option value of length *optlen* is pointed by *optval*.
  *
+ * 	*bpf_socket* should be one of the following:
+ *
+ * 	* **struct bpf_sock_ops** for **BPF_PROG_TYPE_SOCK_OPS**.
+ * 	* **struct bpf_sock_addr** for **BPF_CGROUP_INET4_CONNECT**
+ * 	  and **BPF_CGROUP_INET6_CONNECT**.
+ *
  * 	This helper actually implements a subset of **setsockopt()**.
  * 	It supports the following *level*\ s:
  *
@@ -1181,13 +1191,20 @@ static __u32 (*bpf_set_hash)(struct __sk_buff *skb, __u32 hash) = (void *) 48;
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-static int (*bpf_setsockopt)(struct bpf_sock_ops *bpf_socket, int level, int optname, void *optval, int optlen) = (void *) 49;
+static int (*bpf_setsockopt)(void *bpf_socket, int level, int optname, void *optval, int optlen) = (void *) 49;
 
 /*
  * bpf_skb_adjust_room
  *
  * 	Grow or shrink the room for data in the packet associated to
  * 	*skb* by *len_diff*, and according to the selected *mode*.
+ *
+ * 	By default, the helper will reset any offloaded checksum
+ * 	indicator of the skb to CHECKSUM_NONE. This can be avoided
+ * 	by the following flag:
+ *
+ * 	* **BPF_F_ADJ_ROOM_NO_CSUM_RESET**: Do not reset offloaded
+ * 	  checksum data of the skb to CHECKSUM_NONE.
  *
  * 	There are two supported modes at this time:
  *
@@ -1238,18 +1255,16 @@ static int (*bpf_skb_adjust_room)(struct __sk_buff *skb, __s32 len_diff, __u32 m
  *
  * 	The lower two bits of *flags* are used as the return code if
  * 	the map lookup fails. This is so that the return value can be
- * 	one of the XDP program return codes up to XDP_TX, as chosen by
- * 	the caller. Any higher bits in the *flags* argument must be
+ * 	one of the XDP program return codes up to **XDP_TX**, as chosen
+ * 	by the caller. Any higher bits in the *flags* argument must be
  * 	unset.
  *
- * 	When used to redirect packets to net devices, this helper
- * 	provides a high performance increase over **bpf_redirect**\ ().
- * 	This is due to various implementation details of the underlying
- * 	mechanisms, one of which is the fact that **bpf_redirect_map**\
- * 	() tries to send packet as a "bulk" to the device.
+ * 	See also **bpf_redirect**\ (), which only supports redirecting
+ * 	to an ifindex, but doesn't require a map to do so.
  *
  * Returns
- * 	**XDP_REDIRECT** on success, or **XDP_ABORTED** on error.
+ * 	**XDP_REDIRECT** on success, or the value of the two lower bits
+ * 	of the *flags* argument on error.
  */
 static int (*bpf_redirect_map)(void *map, __u32 key, __u64 flags) = (void *) 51;
 
@@ -1369,7 +1384,7 @@ static int (*bpf_xdp_adjust_meta)(struct xdp_md *xdp_md, int delta) = (void *) 5
  * 	the time running for event since last normalization. The
  * 	enabled and running times are accumulated since the perf event
  * 	open. To achieve scaling factor between two invocations of an
- * 	eBPF program, users can can use CPU id as the key (which is
+ * 	eBPF program, users can use CPU id as the key (which is
  * 	typical for perf array usage model) to remember the previous
  * 	value and do the calculation inside the eBPF program.
  *
@@ -1403,6 +1418,12 @@ static int (*bpf_perf_prog_read_value)(struct bpf_perf_event_data *ctx, struct b
  * 	The retrieved value is stored in the structure pointed by
  * 	*opval* and of length *optlen*.
  *
+ * 	*bpf_socket* should be one of the following:
+ *
+ * 	* **struct bpf_sock_ops** for **BPF_PROG_TYPE_SOCK_OPS**.
+ * 	* **struct bpf_sock_addr** for **BPF_CGROUP_INET4_CONNECT**
+ * 	  and **BPF_CGROUP_INET6_CONNECT**.
+ *
  * 	This helper actually implements a subset of **getsockopt()**.
  * 	It supports the following *level*\ s:
  *
@@ -1414,7 +1435,7 @@ static int (*bpf_perf_prog_read_value)(struct bpf_perf_event_data *ctx, struct b
  * Returns
  * 	0 on success, or a negative error in case of failure.
  */
-static int (*bpf_getsockopt)(struct bpf_sock_ops *bpf_socket, int level, int optname, void *optval, int optlen) = (void *) 57;
+static int (*bpf_getsockopt)(void *bpf_socket, int level, int optname, void *optval, int optlen) = (void *) 57;
 
 /*
  * bpf_override_return
@@ -1424,7 +1445,7 @@ static int (*bpf_getsockopt)(struct bpf_sock_ops *bpf_socket, int level, int opt
  * 	The first argument is the context *regs* on which the kprobe
  * 	works.
  *
- * 	This helper works by setting setting the PC (program counter)
+ * 	This helper works by setting the PC (program counter)
  * 	to an override function which is run in place of the original
  * 	probed function. This means the probed function is not run at
  * 	all. The replacement function just returns with the required
@@ -1617,10 +1638,11 @@ static int (*bpf_msg_pull_data)(struct sk_msg_md *msg, __u32 start, __u32 end, _
  *
  * 	This helper works for IPv4 and IPv6, TCP and UDP sockets. The
  * 	domain (*addr*\ **->sa_family**) must be **AF_INET** (or
- * 	**AF_INET6**). Looking for a free port to bind to can be
- * 	expensive, therefore binding to port is not permitted by the
- * 	helper: *addr*\ **->sin_port** (or **sin6_port**, respectively)
- * 	must be set to zero.
+ * 	**AF_INET6**). It's advised to pass zero port (**sin_port**
+ * 	or **sin6_port**) which triggers IP_BIND_ADDRESS_NO_PORT-like
+ * 	behavior and lets the kernel efficiently pick up an unused
+ * 	port as long as 4-tuple is unique. Passing non-zero port might
+ * 	lead to degraded performance.
  *
  * Returns
  * 	0 on success, or a negative error in case of failure.
@@ -1631,8 +1653,8 @@ static int (*bpf_bind)(struct bpf_sock_addr *ctx, struct sockaddr *addr, int add
  * bpf_xdp_adjust_tail
  *
  * 	Adjust (move) *xdp_md*\ **->data_end** by *delta* bytes. It is
- * 	only possible to shrink the packet as of this writing,
- * 	therefore *delta* must be a negative integer.
+ * 	possible to both shrink and grow the packet tail.
+ * 	Shrink done via *delta* being a negative integer.
  *
  * 	A call to this helper is susceptible to change the underlying
  * 	packet buffer. Therefore, at load time, all checks on pointers
@@ -1970,7 +1992,7 @@ static int (*bpf_rc_repeat)(void *ctx) = (void *) 77;
  * 	**bpf_rc_keydown**\ () again with the same values, or calling
  * 	**bpf_rc_repeat**\ ().
  *
- * 	Some protocols include a toggle bit, in case the button	was
+ * 	Some protocols include a toggle bit, in case the button was
  * 	released and pressed again between consecutive scancodes.
  *
  * 	The *ctx* should point to the lirc sample as passed into
@@ -2406,7 +2428,6 @@ static struct bpf_sock *(*bpf_skc_lookup_tcp)(void *ctx, struct bpf_sock_tuple *
  * 	*th* points to the start of the TCP header, while *th_len*
  * 	contains **sizeof**\ (**struct tcphdr**).
  *
- *
  * Returns
  * 	0 if *iph* and *th* are a valid SYN cookie ACK, or a negative
  * 	error otherwise.
@@ -2629,7 +2650,6 @@ static int (*bpf_send_signal)(__u32 sig) = (void *) 109;
  * 	*th* points to the start of the TCP header, while *th_len*
  * 	contains the length of the TCP header.
  *
- *
  * Returns
  * 	On success, lower 32 bits hold the generated SYN cookie in
  * 	followed by 16 bits which hold the MSS value for that cookie,
@@ -2727,7 +2747,7 @@ static int (*bpf_probe_read_kernel)(void *dst, __u32 size, const void *unsafe_pt
  * 			// size, after checking its boundaries.
  * 		}
  *
- * 	In comparison, using **bpf_probe_read_user()** helper here
+ * 	In comparison, using **bpf_probe_read_user**\ () helper here
  * 	instead to read the string would require to estimate the length
  * 	at compile time, and would often result in copying more memory
  * 	than necessary.
@@ -2749,10 +2769,10 @@ static int (*bpf_probe_read_user_str)(void *dst, __u32 size, const void *unsafe_
  * bpf_probe_read_kernel_str
  *
  * 	Copy a NUL terminated string from an unsafe kernel address *unsafe_ptr*
- * 	to *dst*. Same semantics as with bpf_probe_read_user_str() apply.
+ * 	to *dst*. Same semantics as with **bpf_probe_read_user_str**\ () apply.
  *
  * Returns
- * 	On success, the strictly positive length of the string,	including
+ * 	On success, the strictly positive length of the string, including
  * 	the trailing NUL character. On error, a negative value.
  */
 static int (*bpf_probe_read_kernel_str)(void *dst, __u32 size, const void *unsafe_ptr) = (void *) 115;
@@ -2760,7 +2780,7 @@ static int (*bpf_probe_read_kernel_str)(void *dst, __u32 size, const void *unsaf
 /*
  * bpf_tcp_send_ack
  *
- * 	Send out a tcp-ack. *tp* is the in-kernel struct tcp_sock.
+ * 	Send out a tcp-ack. *tp* is the in-kernel struct **tcp_sock**.
  * 	*rcv_nxt* is the ack_seq to be sent out.
  *
  * Returns
@@ -2795,5 +2815,350 @@ static int (*bpf_send_signal_thread)(__u32 sig) = (void *) 117;
  * 	The 64 bit jiffies
  */
 static __u64 (*bpf_jiffies64)(void) = (void *) 118;
+
+/*
+ * bpf_read_branch_records
+ *
+ * 	For an eBPF program attached to a perf event, retrieve the
+ * 	branch records (**struct perf_branch_entry**) associated to *ctx*
+ * 	and store it in the buffer pointed by *buf* up to size
+ * 	*size* bytes.
+ *
+ * Returns
+ * 	On success, number of bytes written to *buf*. On error, a
+ * 	negative value.
+ *
+ * 	The *flags* can be set to **BPF_F_GET_BRANCH_RECORDS_SIZE** to
+ * 	instead return the number of bytes required to store all the
+ * 	branch entries. If this flag is set, *buf* may be NULL.
+ *
+ * 	**-EINVAL** if arguments invalid or **size** not a multiple
+ * 	of **sizeof**\ (**struct perf_branch_entry**\ ).
+ *
+ * 	**-ENOENT** if architecture does not support branch records.
+ */
+static int (*bpf_read_branch_records)(struct bpf_perf_event_data *ctx, void *buf, __u32 size, __u64 flags) = (void *) 119;
+
+/*
+ * bpf_get_ns_current_pid_tgid
+ *
+ * 	Returns 0 on success, values for *pid* and *tgid* as seen from the current
+ * 	*namespace* will be returned in *nsdata*.
+ *
+ * Returns
+ * 	0 on success, or one of the following in case of failure:
+ *
+ * 	**-EINVAL** if dev and inum supplied don't match dev_t and inode number
+ * 	with nsfs of current task, or if dev conversion to dev_t lost high bits.
+ *
+ * 	**-ENOENT** if pidns does not exists for the current task.
+ */
+static int (*bpf_get_ns_current_pid_tgid)(__u64 dev, __u64 ino, struct bpf_pidns_info *nsdata, __u32 size) = (void *) 120;
+
+/*
+ * bpf_xdp_output
+ *
+ * 	Write raw *data* blob into a special BPF perf event held by
+ * 	*map* of type **BPF_MAP_TYPE_PERF_EVENT_ARRAY**. This perf
+ * 	event must have the following attributes: **PERF_SAMPLE_RAW**
+ * 	as **sample_type**, **PERF_TYPE_SOFTWARE** as **type**, and
+ * 	**PERF_COUNT_SW_BPF_OUTPUT** as **config**.
+ *
+ * 	The *flags* are used to indicate the index in *map* for which
+ * 	the value must be put, masked with **BPF_F_INDEX_MASK**.
+ * 	Alternatively, *flags* can be set to **BPF_F_CURRENT_CPU**
+ * 	to indicate that the index of the current CPU core should be
+ * 	used.
+ *
+ * 	The value to write, of *size*, is passed through eBPF stack and
+ * 	pointed by *data*.
+ *
+ * 	*ctx* is a pointer to in-kernel struct xdp_buff.
+ *
+ * 	This helper is similar to **bpf_perf_eventoutput**\ () but
+ * 	restricted to raw_tracepoint bpf programs.
+ *
+ * Returns
+ * 	0 on success, or a negative error in case of failure.
+ */
+static int (*bpf_xdp_output)(void *ctx, void *map, __u64 flags, void *data, __u64 size) = (void *) 121;
+
+/*
+ * bpf_get_netns_cookie
+ *
+ * 	Retrieve the cookie (generated by the kernel) of the network
+ * 	namespace the input *ctx* is associated with. The network
+ * 	namespace cookie remains stable for its lifetime and provides
+ * 	a global identifier that can be assumed unique. If *ctx* is
+ * 	NULL, then the helper returns the cookie for the initial
+ * 	network namespace. The cookie itself is very similar to that
+ * 	of **bpf_get_socket_cookie**\ () helper, but for network
+ * 	namespaces instead of sockets.
+ *
+ * Returns
+ * 	A 8-byte long opaque number.
+ */
+static __u64 (*bpf_get_netns_cookie)(void *ctx) = (void *) 122;
+
+/*
+ * bpf_get_current_ancestor_cgroup_id
+ *
+ * 	Return id of cgroup v2 that is ancestor of the cgroup associated
+ * 	with the current task at the *ancestor_level*. The root cgroup
+ * 	is at *ancestor_level* zero and each step down the hierarchy
+ * 	increments the level. If *ancestor_level* == level of cgroup
+ * 	associated with the current task, then return value will be the
+ * 	same as that of **bpf_get_current_cgroup_id**\ ().
+ *
+ * 	The helper is useful to implement policies based on cgroups
+ * 	that are upper in hierarchy than immediate cgroup associated
+ * 	with the current task.
+ *
+ * 	The format of returned id and helper limitations are same as in
+ * 	**bpf_get_current_cgroup_id**\ ().
+ *
+ * Returns
+ * 	The id is returned or 0 in case the id could not be retrieved.
+ */
+static __u64 (*bpf_get_current_ancestor_cgroup_id)(int ancestor_level) = (void *) 123;
+
+/*
+ * bpf_sk_assign
+ *
+ * 	Assign the *sk* to the *skb*. When combined with appropriate
+ * 	routing configuration to receive the packet towards the socket,
+ * 	will cause *skb* to be delivered to the specified socket.
+ * 	Subsequent redirection of *skb* via  **bpf_redirect**\ (),
+ * 	**bpf_clone_redirect**\ () or other methods outside of BPF may
+ * 	interfere with successful delivery to the socket.
+ *
+ * 	This operation is only valid from TC ingress path.
+ *
+ * 	The *flags* argument must be zero.
+ *
+ * Returns
+ * 	0 on success, or a negative error in case of failure:
+ *
+ * 	**-EINVAL** if specified *flags* are not supported.
+ *
+ * 	**-ENOENT** if the socket is unavailable for assignment.
+ *
+ * 	**-ENETUNREACH** if the socket is unreachable (wrong netns).
+ *
+ * 	**-EOPNOTSUPP** if the operation is not supported, for example
+ * 	a call from outside of TC ingress.
+ *
+ * 	**-ESOCKTNOSUPPORT** if the socket type is not supported
+ * 	(reuseport).
+ */
+static int (*bpf_sk_assign)(struct __sk_buff *skb, struct bpf_sock *sk, __u64 flags) = (void *) 124;
+
+/*
+ * bpf_ktime_get_boot_ns
+ *
+ * 	Return the time elapsed since system boot, in nanoseconds.
+ * 	Does include the time the system was suspended.
+ * 	See: **clock_gettime**\ (**CLOCK_BOOTTIME**)
+ *
+ * Returns
+ * 	Current *ktime*.
+ */
+static __u64 (*bpf_ktime_get_boot_ns)(void) = (void *) 125;
+
+/*
+ * bpf_seq_printf
+ *
+ * 	**bpf_seq_printf**\ () uses seq_file **seq_printf**\ () to print
+ * 	out the format string.
+ * 	The *m* represents the seq_file. The *fmt* and *fmt_size* are for
+ * 	the format string itself. The *data* and *data_len* are format string
+ * 	arguments. The *data* are a **u64** array and corresponding format string
+ * 	values are stored in the array. For strings and pointers where pointees
+ * 	are accessed, only the pointer values are stored in the *data* array.
+ * 	The *data_len* is the size of *data* in bytes.
+ *
+ * 	Formats **%s**, **%p{i,I}{4,6}** requires to read kernel memory.
+ * 	Reading kernel memory may fail due to either invalid address or
+ * 	valid address but requiring a major memory fault. If reading kernel memory
+ * 	fails, the string for **%s** will be an empty string, and the ip
+ * 	address for **%p{i,I}{4,6}** will be 0. Not returning error to
+ * 	bpf program is consistent with what **bpf_trace_printk**\ () does for now.
+ *
+ * Returns
+ * 	0 on success, or a negative error in case of failure:
+ *
+ * 	**-EBUSY** if per-CPU memory copy buffer is busy, can try again
+ * 	by returning 1 from bpf program.
+ *
+ * 	**-EINVAL** if arguments are invalid, or if *fmt* is invalid/unsupported.
+ *
+ * 	**-E2BIG** if *fmt* contains too many format specifiers.
+ *
+ * 	**-EOVERFLOW** if an overflow happened: The same object will be tried again.
+ */
+static int (*bpf_seq_printf)(struct seq_file *m, const char *fmt, __u32 fmt_size, const void *data, __u32 data_len) = (void *) 126;
+
+/*
+ * bpf_seq_write
+ *
+ * 	**bpf_seq_write**\ () uses seq_file **seq_write**\ () to write the data.
+ * 	The *m* represents the seq_file. The *data* and *len* represent the
+ * 	data to write in bytes.
+ *
+ * Returns
+ * 	0 on success, or a negative error in case of failure:
+ *
+ * 	**-EOVERFLOW** if an overflow happened: The same object will be tried again.
+ */
+static int (*bpf_seq_write)(struct seq_file *m, const void *data, __u32 len) = (void *) 127;
+
+/*
+ * bpf_sk_cgroup_id
+ *
+ * 	Return the cgroup v2 id of the socket *sk*.
+ *
+ * 	*sk* must be a non-**NULL** pointer to a full socket, e.g. one
+ * 	returned from **bpf_sk_lookup_xxx**\ (),
+ * 	**bpf_sk_fullsock**\ (), etc. The format of returned id is
+ * 	same as in **bpf_skb_cgroup_id**\ ().
+ *
+ * 	This helper is available only if the kernel was compiled with
+ * 	the **CONFIG_SOCK_CGROUP_DATA** configuration option.
+ *
+ * Returns
+ * 	The id is returned or 0 in case the id could not be retrieved.
+ */
+static __u64 (*bpf_sk_cgroup_id)(struct bpf_sock *sk) = (void *) 128;
+
+/*
+ * bpf_sk_ancestor_cgroup_id
+ *
+ * 	Return id of cgroup v2 that is ancestor of cgroup associated
+ * 	with the *sk* at the *ancestor_level*.  The root cgroup is at
+ * 	*ancestor_level* zero and each step down the hierarchy
+ * 	increments the level. If *ancestor_level* == level of cgroup
+ * 	associated with *sk*, then return value will be same as that
+ * 	of **bpf_sk_cgroup_id**\ ().
+ *
+ * 	The helper is useful to implement policies based on cgroups
+ * 	that are upper in hierarchy than immediate cgroup associated
+ * 	with *sk*.
+ *
+ * 	The format of returned id and helper limitations are same as in
+ * 	**bpf_sk_cgroup_id**\ ().
+ *
+ * Returns
+ * 	The id is returned or 0 in case the id could not be retrieved.
+ */
+static __u64 (*bpf_sk_ancestor_cgroup_id)(struct bpf_sock *sk, int ancestor_level) = (void *) 129;
+
+/*
+ * bpf_ringbuf_output
+ *
+ * 	Copy *size* bytes from *data* into a ring buffer *ringbuf*.
+ * 	If BPF_RB_NO_WAKEUP is specified in *flags*, no notification of
+ * 	new data availability is sent.
+ * 	IF BPF_RB_FORCE_WAKEUP is specified in *flags*, notification of
+ * 	new data availability is sent unconditionally.
+ *
+ * Returns
+ * 	0, on success;
+ * 	< 0, on error.
+ */
+static void *(*bpf_ringbuf_output)(void *ringbuf, void *data, __u64 size, __u64 flags) = (void *) 130;
+
+/*
+ * bpf_ringbuf_reserve
+ *
+ * 	Reserve *size* bytes of payload in a ring buffer *ringbuf*.
+ *
+ * Returns
+ * 	Valid pointer with *size* bytes of memory available; NULL,
+ * 	otherwise.
+ */
+static void *(*bpf_ringbuf_reserve)(void *ringbuf, __u64 size, __u64 flags) = (void *) 131;
+
+/*
+ * bpf_ringbuf_submit
+ *
+ * 	Submit reserved ring buffer sample, pointed to by *data*.
+ * 	If BPF_RB_NO_WAKEUP is specified in *flags*, no notification of
+ * 	new data availability is sent.
+ * 	IF BPF_RB_FORCE_WAKEUP is specified in *flags*, notification of
+ * 	new data availability is sent unconditionally.
+ *
+ * Returns
+ * 	Nothing. Always succeeds.
+ */
+static void (*bpf_ringbuf_submit)(void *data, __u64 flags) = (void *) 132;
+
+/*
+ * bpf_ringbuf_discard
+ *
+ * 	Discard reserved ring buffer sample, pointed to by *data*.
+ * 	If BPF_RB_NO_WAKEUP is specified in *flags*, no notification of
+ * 	new data availability is sent.
+ * 	IF BPF_RB_FORCE_WAKEUP is specified in *flags*, notification of
+ * 	new data availability is sent unconditionally.
+ *
+ * Returns
+ * 	Nothing. Always succeeds.
+ */
+static void (*bpf_ringbuf_discard)(void *data, __u64 flags) = (void *) 133;
+
+/*
+ * bpf_ringbuf_query
+ *
+ * 	Query various characteristics of provided ring buffer. What
+ * 	exactly is queries is determined by *flags*:
+ * 	  - BPF_RB_AVAIL_DATA - amount of data not yet consumed;
+ * 	  - BPF_RB_RING_SIZE - the size of ring buffer;
+ * 	  - BPF_RB_CONS_POS - consumer position (can wrap around);
+ * 	  - BPF_RB_PROD_POS - producer(s) position (can wrap around);
+ * 	Data returned is just a momentary snapshots of actual values
+ * 	and could be inaccurate, so this facility should be used to
+ * 	power heuristics and for reporting, not to make 100% correct
+ * 	calculation.
+ *
+ * Returns
+ * 	Requested value, or 0, if flags are not recognized.
+ */
+static __u64 (*bpf_ringbuf_query)(void *ringbuf, __u64 flags) = (void *) 134;
+
+/*
+ * bpf_csum_level
+ *
+ * 	Change the skbs checksum level by one layer up or down, or
+ * 	reset it entirely to none in order to have the stack perform
+ * 	checksum validation. The level is applicable to the following
+ * 	protocols: TCP, UDP, GRE, SCTP, FCOE. For example, a decap of
+ * 	| ETH | IP | UDP | GUE | IP | TCP | into | ETH | IP | TCP |
+ * 	through **bpf_skb_adjust_room**\ () helper with passing in
+ * 	**BPF_F_ADJ_ROOM_NO_CSUM_RESET** flag would require one	call
+ * 	to **bpf_csum_level**\ () with **BPF_CSUM_LEVEL_DEC** since
+ * 	the UDP header is removed. Similarly, an encap of the latter
+ * 	into the former could be accompanied by a helper call to
+ * 	**bpf_csum_level**\ () with **BPF_CSUM_LEVEL_INC** if the
+ * 	skb is still intended to be processed in higher layers of the
+ * 	stack instead of just egressing at tc.
+ *
+ * 	There are three supported level settings at this time:
+ *
+ * 	* **BPF_CSUM_LEVEL_INC**: Increases skb->csum_level for skbs
+ * 	  with CHECKSUM_UNNECESSARY.
+ * 	* **BPF_CSUM_LEVEL_DEC**: Decreases skb->csum_level for skbs
+ * 	  with CHECKSUM_UNNECESSARY.
+ * 	* **BPF_CSUM_LEVEL_RESET**: Resets skb->csum_level to 0 and
+ * 	  sets CHECKSUM_NONE to force checksum validation by the stack.
+ * 	* **BPF_CSUM_LEVEL_QUERY**: No-op, returns the current
+ * 	  skb->csum_level.
+ *
+ * Returns
+ * 	0 on success, or a negative error in case of failure. In the
+ * 	case of **BPF_CSUM_LEVEL_QUERY**, the current skb->csum_level
+ * 	is returned or the error code -EACCES in case the skb is not
+ * 	subject to CHECKSUM_UNNECESSARY.
+ */
+static int (*bpf_csum_level)(struct __sk_buff *skb, __u64 level) = (void *) 135;
 
 

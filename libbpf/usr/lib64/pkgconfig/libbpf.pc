@@ -6,7 +6,7 @@ includedir=${prefix}/include
 
 Name: libbpf
 Description: BPF library
-Version: 0.0.7
+Version: 0.0.9
 Libs: -L${libdir} -lbpf
 Requires.private: libelf zlib
 Cflags: -I${includedir}
