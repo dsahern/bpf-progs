@@ -162,6 +162,7 @@ static void fixup_ksym(struct ksym_s *sym, char *fields[], int nfields)
 int load_ksyms(const char *file)
 {
 	struct ksym_s *sym = NULL, *prev_sym = NULL;
+	unsigned long long init_net = 0;
 	unsigned int lineno = 0;
 	unsigned long addr = 0;
 	char line[1024];
@@ -210,8 +211,11 @@ int load_ksyms(const char *file)
 		}
 
 		stype = fields[1];
-		if (*stype != 'T' && *stype != 't')
+		if (*stype != 'T' && *stype != 't') {
+			if (!strcmp(fields[2], "init_net"))
+				init_net = addr;
 			continue;
+		}
 
 		/*
 		 * check for multiple entries with the same address
@@ -252,6 +256,12 @@ int load_ksyms(const char *file)
 	if (prev_sym) {
 		prev_sym->addr_next = (unsigned long long)(-1);
 		insert_ksym(prev_sym);
+	}
+
+	if (init_net) {
+		sym = new_ksym(init_net, "init_net", "[kernel]");
+		if (sym)
+			insert_ksym(sym);
 	}
 
 	fclose(fp);
