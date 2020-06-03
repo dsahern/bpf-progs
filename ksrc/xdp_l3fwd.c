@@ -33,7 +33,7 @@ static __always_inline int ip_decrease_ttl(struct iphdr *iph)
 	return --iph->ttl;
 }
 
-static __always_inline int xdp_fwd_flags(struct xdp_md *ctx, u32 flags)
+static __always_inline int xdp_l3fwd_flags(struct xdp_md *ctx, u32 flags)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
@@ -108,16 +108,16 @@ static __always_inline int xdp_fwd_flags(struct xdp_md *ctx, u32 flags)
 	return XDP_PASS;
 }
 
-SEC("xdp_fwd")
-int xdp_fwd_prog(struct xdp_md *ctx)
+SEC("xdp_l3fwd")
+int xdp_l3fwd_prog(struct xdp_md *ctx)
 {
-	return xdp_fwd_flags(ctx, 0);
+	return xdp_l3fwd_flags(ctx, 0);
 }
 
-SEC("xdp_fwd_direct")
-int xdp_fwd_direct_prog(struct xdp_md *ctx)
+SEC("xdp_l3fwd_direct")
+int xdp_l3fwd_direct_prog(struct xdp_md *ctx)
 {
-	return xdp_fwd_flags(ctx, BPF_FIB_LOOKUP_DIRECT);
+	return xdp_l3fwd_flags(ctx, BPF_FIB_LOOKUP_DIRECT);
 }
 
 char _license[] SEC("license") = "GPL";
