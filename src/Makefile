@@ -18,6 +18,7 @@ MODS += $(OBJDIR)ovslatency
 MODS += $(OBJDIR)net_rx_action
 
 MODS += $(OBJDIR)xdp_dummy
+MODS += $(OBJDIR)vm_info
 
 VPATH := .
 
