@@ -38,6 +38,7 @@ MODS += $(OBJDIR)tcp_probe.o
 MODS += $(OBJDIR)xdp_l2fwd.o
 MODS += $(OBJDIR)xdp_l3fwd.o
 MODS += $(OBJDIR)xdp_dummy.o
+MODS += $(OBJDIR)xdp_vmegress.o
 
 MODS += $(OBJDIR)tx_acl.o
 MODS += $(OBJDIR)rx_acl.o
