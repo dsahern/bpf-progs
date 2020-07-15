@@ -11,12 +11,13 @@
 #include <linux/if_vlan.h>
 #include <linux/version.h>
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 
 #include "xdp_fdb.h"
 
 /* For TX-traffic redirect requires net_device ifindex to be in this devmap */
 struct bpf_map_def SEC("maps") xdp_fwd_ports = {
-	.type = BPF_MAP_TYPE_DEVMAP,
+	.type = BPF_MAP_TYPE_DEVMAP_HASH,
 	.key_size = sizeof(u32),
 	.value_size = sizeof(struct bpf_devmap_val),
 	.max_entries = 512,
@@ -35,12 +36,12 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
+	struct bpf_devmap_val *entry;
 	struct vlan_hdr *vhdr;
 	struct ethhdr *eth;
 	struct fdb_key key;
 	u8 smac[ETH_ALEN];
 	u16 h_proto = 0;
-	u32 *entry;
 	void *nh;
 	int rc;
 
@@ -68,11 +69,11 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	__builtin_memcpy(key.mac, eth->h_dest, ETH_ALEN);
 
 	entry = bpf_map_lookup_elem(&fdb_map, &key);
-	if (!entry || *entry == 0)
+	if (!entry || entry->ifindex == 0)
 		return XDP_PASS;
 
 	/* Verify redirect index exists in port map */
-	if (!bpf_map_lookup_elem(&xdp_fwd_ports, entry))
+	if (!bpf_map_lookup_elem(&xdp_fwd_ports, &entry->ifindex))
 		return XDP_PASS;
 
 	/* remove VLAN header before hand off to VM */
@@ -93,7 +94,7 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	__builtin_memcpy(eth->h_source, smac, ETH_ALEN);
 	eth->h_proto = h_proto;
 
-	return bpf_redirect_map(&xdp_fwd_ports, *entry, 0);
+	return bpf_redirect_map(&xdp_fwd_ports, entry->ifindex, 0);
 }
 
 char _license[] SEC("license") = "GPL";

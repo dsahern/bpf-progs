@@ -15,12 +15,4 @@ struct fdb_key
 	__u16 vlan;
 };
 
-struct bpf_devmap_val {
-	__u32 ifindex;
-	union {
-		int fd;
-		__u32 id;
-	} bpf_prog;
-};
-
 #endif
