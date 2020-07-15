@@ -39,6 +39,9 @@ MODS += $(OBJDIR)xdp_l2fwd.o
 MODS += $(OBJDIR)xdp_l3fwd.o
 MODS += $(OBJDIR)xdp_dummy.o
 
+MODS += $(OBJDIR)tx_acl.o
+MODS += $(OBJDIR)rx_acl.o
+
 VPATH := .
 
 # rule is based on samples/bpf/Makefile
