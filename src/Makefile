@@ -24,7 +24,7 @@ MODS += $(OBJDIR)vm_info
 VPATH := .
 
 CC = gcc
-CFLAGS = -O2 -g -Wall
+CFLAGS += -O2 -g -Wall
 
 INCLUDES  = -I../include -I../include/uapi
 INCLUDES += -I../include/tools
@@ -49,24 +49,22 @@ COMMON += $(OBJDIR)parse_pkt.o
 COMMON += $(OBJDIR)print_pkt.o
 COMMON += $(OBJDIR)ksyms.o
 
-all: build common $(MODS)
+all: build $(MODS)
 
 build:
 	@mkdir -p $(OBJDIR)
 
-common: $(COMMON)
-
 $(OBJDIR)%: $(OBJDIR)%.o $(COMMON)
-	$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS)
+	$(QUIET_LINK)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS)
 
 $(OBJDIR)xdp_%: $(OBJDIR)xdp_%_user.o $(COMMON)
-	$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS)
+	$(QUIET_LINK)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS)
 
 $(OBJDIR)%.o: %.c
-	$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) -c $^ -o $@
+	$(QUIET_CC)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) -c $^ -o $@
 
 $(OBJDIR)netmon: $(OBJDIR)netmon.o $(COMMON)
-	$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS) -lpcap
+	$(QUIET_LINK)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS) -lpcap
 
 clean:
 	@rm -rf obj

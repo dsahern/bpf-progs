@@ -87,10 +87,10 @@ build:
 	@mkdir -p $(OBJDIR)
 
 $(OBJDIR)%.o: %.c
-	$(CLANG) $(NOSTDINC_FLAGS) $(INCLUDES) \
+	$(QUIET_CLANG)$(CLANG) $(NOSTDINC_FLAGS) $(INCLUDES) \
 		$(SINCLUDES) $(DEFS) $(CFLAGS) \
 		-O2 -emit-llvm -c $< -o $@.cl
-	$(LLC) -march=bpf $(LLC_FLAGS) -filetype=obj -o $@ $@.cl
+	$(QUIET_LLC)$(LLC) -march=bpf $(LLC_FLAGS) -filetype=obj -o $@ $@.cl
 	@rm $@.cl
 
 clean:
