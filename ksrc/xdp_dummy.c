@@ -11,9 +11,8 @@
 SEC("xdp_dummy")
 int xdp_dummy_prog(struct xdp_md *ctx)
 {
-	char fmt[] = "ingress: device %u queue %u\n";
-
-	bpf_trace_printk(fmt, sizeof(fmt), ctx->ingress_ifindex, ctx->rx_queue_index);
+	//bpf_debug("ingress: device %u queue %u\n",
+	//	      ctx->ingress_ifindex, ctx->rx_queue_index);
 
 	return XDP_PASS;
 }
