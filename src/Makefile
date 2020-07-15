@@ -6,6 +6,7 @@ OBJDIR = obj/
 MODS += $(OBJDIR)tcp_probe
 MODS += $(OBJDIR)xdp_l2fwd
 MODS += $(OBJDIR)xdp_l3fwd
+MODS += $(OBJDIR)xdp_acl
 
 MODS += $(OBJDIR)execsnoop
 MODS += $(OBJDIR)opensnoop
