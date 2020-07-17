@@ -1,6 +1,6 @@
 # bpf-progs
 
-Hopefully this repository is self contained now. It compiles cleanly on Ubuntu
+This repository is self contained now. It compiles cleanly on Ubuntu
 18.04 for kernel versions 4.14, 4.15, 5.3 and 5.5+.
 ```
 apt-get install clang llvm gcc make libelf-dev
@@ -67,8 +67,8 @@ sudo src/obj/opensnoop
 xdp\_l2fwd handles Layer 2 forwarding between an ingress device (e.g., host
 devices) and egress device (e.g., tap device for VMs). Userspace populates
 an FDB (hash map) with \<vlan,dmac> pairs returning an index into a device
-map which contains the device to receive the packet. Lifecycle is managed by
-scripts/xdp\_l2fwd.sh.
+map which contains the device to receive the packet. See scripts/l2fwd-demo.sh
+for an example.
 
 This program is used for the netdev 0x14 tutorial, XDP and the cloud: Using
 XDP on hosts and VMs https://netdevconf.info/0x14/session.html?tutorial-XDP-and-the-cloud
