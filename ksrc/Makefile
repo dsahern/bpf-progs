@@ -40,8 +40,8 @@ MODS += $(OBJDIR)xdp_l3fwd.o
 MODS += $(OBJDIR)xdp_dummy.o
 MODS += $(OBJDIR)xdp_vmegress.o
 
-MODS += $(OBJDIR)tx_acl.o
-MODS += $(OBJDIR)rx_acl.o
+MODS += $(OBJDIR)acl_vm_tx.o
+MODS += $(OBJDIR)acl_vm_rx.o
 
 VPATH := .
 

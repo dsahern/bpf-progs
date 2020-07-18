@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0
 /* Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  *
- * Rx ACL - packets from VM
+ * Rx ACL for a VM - packets from VM
  */
-#define KBUILD_MODNAME "rx_acl"
+#define KBUILD_MODNAME "acl_vm_rx"
 #include <uapi/linux/bpf.h>
 
-#include "acl.h"
+#include "acl_vm_common.h"
 
 struct bpf_map_def SEC("maps") __rx_acl_map = {
 	.type = BPF_MAP_TYPE_HASH,
@@ -22,8 +22,8 @@ struct bpf_map_def SEC("maps") __vm_info_map = {
 	.max_entries = 1,
 };
 
-SEC("classifier/rx_acl")
-int tc_acl_rx_prog(struct __sk_buff *skb)
+SEC("classifier/acl_vm_rx")
+int tc_acl_vm_rx_prog(struct __sk_buff *skb)
 {
 	void *data_end = (void *)(long)skb->data_end;
 	void *data = (void *)(long)skb->data;
@@ -41,8 +41,8 @@ int tc_acl_rx_prog(struct __sk_buff *skb)
 	return rc ? TC_ACT_SHOT : TC_ACT_OK;
 }
 
-SEC("xdp/rx_acl")
-int xdp_rx_acl_prog(struct xdp_md *ctx)
+SEC("xdp/acl_vm_rx")
+int xdp_acl_vm_rx_prog(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
