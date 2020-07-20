@@ -42,6 +42,7 @@ MODS += $(OBJDIR)xdp_vmegress.o
 
 MODS += $(OBJDIR)acl_vm_tx.o
 MODS += $(OBJDIR)acl_vm_rx.o
+MODS += $(OBJDIR)rx_acl.o
 
 VPATH := .
 
