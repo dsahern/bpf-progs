@@ -211,7 +211,7 @@ clear
 echo
 pr_msg "Load ACL programs for this VM and attach to tap device"
 run_cmd ${BPFTOOL} prog loadall \
-    ksrc/obj/tx_acl.o ${BPFFS}/prog/tx_acl_${VMID} \
+    ksrc/obj/acl_vm_tx.o ${BPFFS}/prog/acl_tx_${VMID} \
     map name __vm_info_map name vm_info_map \
     map name __tx_acl_map  name tx_acl_${VMID}
 
@@ -234,7 +234,7 @@ echo
 pr_msg "Add FDB and port map entries for this VM"
 pr_msg "- adds Tx ACL (packets to VM) to map entry"
 run_cmd src/obj/xdp_l2fwd -v ${PVLAN} -m ${PMAC} -d tapext${VMID} \
-    -p ${BPFFS}/prog/tx_acl_${VMID}/xdp_devmap_tx_acl
+    -p ${BPFFS}/prog/acl_tx_${VMID}/xdp_devmap_acl_vm_tx
 
 run_cmd src/obj/xdp_l2fwd -P
 
