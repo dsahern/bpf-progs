@@ -160,6 +160,7 @@ pr_msg "VM is started, but paused - to get tap devices created"
 run_cmd sudo virsh start --paused ${VMNAME}
 
 # keep vhost threads on cpus 60 and under
+# - this applies to mlx5 driver on a host wtih 96 cpus
 ps -e -o "pid comm" | grep vhost |
 while read p c; do
 	egrep "Cpus_allowed:" /proc/${p}/status | grep -q '00000000,02aaaaaa,aa8002aa'
