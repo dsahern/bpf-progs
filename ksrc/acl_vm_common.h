@@ -18,6 +18,7 @@
 #include "vm_info.h"
 #include "eth_helpers.h"
 
+#define XDP_ACL_DEBUG
 #ifdef XDP_ACL_DEBUG
 #include "bpf_debug.h"
 #else
