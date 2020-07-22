@@ -1,5 +1,12 @@
 #!/bin/bash
 
+dpkg -l | grep -q debhelper
+if [ $? -ne 0 ]
+then
+	echo "debhelper package not installed"
+	exit 1
+fi
+
 set -e
 set -x
 
