@@ -1,25 +1,35 @@
 
 include ../config.mk
 
+ifneq (,$(BUILDDIR))
+OBJDIR = $(BUILDDIR)/src/obj/
+else
 OBJDIR = obj/
+endif
 
-MODS += $(OBJDIR)tcp_probe
-MODS += $(OBJDIR)xdp_l2fwd
-MODS += $(OBJDIR)xdp_l3fwd
-MODS += $(OBJDIR)xdp_acl
+ifneq (,$(BUILDDIR))
+BINDIR = $(BUILDDIR)/src/bin/
+else
+BINDIR = bin/
+endif
 
-MODS += $(OBJDIR)execsnoop
-MODS += $(OBJDIR)opensnoop
-MODS += $(OBJDIR)cgroup_sock
-MODS += $(OBJDIR)kvm-nested
+MODS += $(BINDIR)tcp_probe
+MODS += $(BINDIR)xdp_l2fwd
+MODS += $(BINDIR)xdp_l3fwd
+MODS += $(BINDIR)xdp_acl
 
-MODS += $(OBJDIR)netmon
-MODS += $(OBJDIR)pktlatency
-MODS += $(OBJDIR)ovslatency
-MODS += $(OBJDIR)net_rx_action
+MODS += $(BINDIR)execsnoop
+MODS += $(BINDIR)opensnoop
+MODS += $(BINDIR)cgroup_sock
+MODS += $(BINDIR)kvm-nested
 
-MODS += $(OBJDIR)xdp_dummy
-MODS += $(OBJDIR)vm_info
+MODS += $(BINDIR)netmon
+MODS += $(BINDIR)pktlatency
+MODS += $(BINDIR)ovslatency
+MODS += $(BINDIR)net_rx_action
+
+MODS += $(BINDIR)xdp_dummy
+MODS += $(BINDIR)vm_info
 
 VPATH := .
 
@@ -52,19 +62,19 @@ COMMON += $(OBJDIR)ksyms.o
 all: build $(MODS)
 
 build:
-	@mkdir -p $(OBJDIR)
+	@mkdir -p $(OBJDIR) $(BINDIR)
 
-$(OBJDIR)%: $(OBJDIR)%.o $(COMMON)
+$(BINDIR)%: $(OBJDIR)%.o $(COMMON)
 	$(QUIET_LINK)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS)
 
-$(OBJDIR)xdp_%: $(OBJDIR)xdp_%_user.o $(COMMON)
+$(BINDIR)xdp_%: $(OBJDIR)xdp_%_user.o $(COMMON)
 	$(QUIET_LINK)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS)
 
 $(OBJDIR)%.o: %.c
 	$(QUIET_CC)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) -c $^ -o $@
 
-$(OBJDIR)netmon: $(OBJDIR)netmon.o $(COMMON)
+$(BINDIR)netmon: $(OBJDIR)netmon.o $(COMMON)
 	$(QUIET_LINK)$(CC) $(INCLUDES) $(DEFS) $(CFLAGS) $^ -o $@ $(LIBS) -lpcap
 
 clean:
-	@rm -rf obj
+	@rm -rf $(OBJDIR) $(BINDIR)

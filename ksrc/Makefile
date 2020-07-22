@@ -22,7 +22,11 @@ ifneq (,$(XDP_EGRESS_FEAT))
 CFLAGS += -DHAVE_EGRESS_IFINDEX
 endif
 
+ifneq (,$(BUILDDIR))
+OBJDIR = $(BUILDDIR)/ksrc/obj/
+else
 OBJDIR = obj/
+endif
 
 MODS += $(OBJDIR)execsnoop.o
 MODS += $(OBJDIR)execsnoop_legacy.o
@@ -95,4 +99,4 @@ $(OBJDIR)%.o: %.c
 	@rm $@.cl
 
 clean:
-	@rm -rf $(OBJDIR)
+	@rm -rf $(OBJDIR) $(BINDIR)
