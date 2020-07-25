@@ -165,17 +165,17 @@ ps -e -o "pid comm" | grep vhost |
 while read p c; do
 	egrep "Cpus_allowed:" /proc/${p}/status | grep -q '00000000,02aaaaaa,aa8002aa'
 	if [ $? -eq 0 ]; then
-		sudo taskset -pc 1,3,5,7,9,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57 $p >/dev/null 2>&1
-	else
 		sudo taskset -pc 0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44 $p >/dev/null 2>&1
+	else
+		sudo taskset -pc 1,3,5,7,9,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57 $p >/dev/null 2>&1
 	fi
 done
 
 echo
 pr_msg "Add entries to VM info map"
-run_cmd src/obj/vm_info -i ${VMID} -d tapext${VMID} -v 51 -m ${PMAC} -4 ${PV4} -6 ${PV6}
-run_cmd src/obj/vm_info -i ${VMID} -d tapint${VMID} -m ${VMAC} -4 ${VV4}
-run_cmd sudo src/obj/vm_info -P
+run_cmd src/bin/vm_info -i ${VMID} -d tapext${VMID} -v 51 -m ${PMAC} -4 ${PV4} -6 ${PV6}
+run_cmd src/bin/vm_info -i ${VMID} -d tapint${VMID} -m ${VMAC} -4 ${VV4}
+run_cmd src/bin/vm_info -P
 read ans
 
 ################################################################################
@@ -194,16 +194,16 @@ pr_msg "At this point ACL entries can be created for this VM"
 read ans
 echo
 pr_msg "Example: block VM from sending email via smtp"
-run_cmd src/obj/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -- "proto=tcp,dport=25"
-run_cmd src/obj/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -- "proto=udp,dport=25"
+run_cmd src/bin/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -- "proto=tcp,dport=25"
+run_cmd src/bin/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -- "proto=udp,dport=25"
 echo
 pr_msg "Example: block VM from reaching 80/tcp (easy to test)"
-run_cmd src/obj/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -- "proto=tcp,dport=80"
-run_cmd src/obj/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -P
+run_cmd src/bin/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -- "proto=tcp,dport=80"
+run_cmd src/bin/xdp_acl -p ${BPFFS}/map/rx_acl_${VMID} -P
 echo
 pr_msg "Example: block access to VM port 80/tcp"
-run_cmd src/obj/xdp_acl -p ${BPFFS}/map/tx_acl_${VMID} -- "proto=tcp,dport=80"
-run_cmd src/obj/xdp_acl -p ${BPFFS}/map/tx_acl_${VMID} -P
+run_cmd src/bin/xdp_acl -p ${BPFFS}/map/tx_acl_${VMID} -- "proto=tcp,dport=80"
+run_cmd src/bin/xdp_acl -p ${BPFFS}/map/tx_acl_${VMID} -P
 
 read ans
 
@@ -234,10 +234,10 @@ clear
 echo
 pr_msg "Add FDB and port map entries for this VM"
 pr_msg "- adds Tx ACL (packets to VM) to map entry"
-run_cmd src/obj/xdp_l2fwd -v ${PVLAN} -m ${PMAC} -d tapext${VMID} \
+run_cmd src/bin/xdp_l2fwd -v ${PVLAN} -m ${PMAC} -d tapext${VMID} \
     -p ${BPFFS}/prog/acl_tx_${VMID}/xdp_devmap_acl_vm_tx
 
-run_cmd src/obj/xdp_l2fwd -P
+run_cmd src/bin/xdp_l2fwd -P
 
 echo
 pr_msg "Resume VM"
