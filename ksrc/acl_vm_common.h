@@ -38,9 +38,10 @@ static __always_inline bool my_ipv6_addr_cmp(const struct in6_addr *a1,
 
 static __always_inline bool ipv6_any(const struct in6_addr *a1)
 {
-	struct in6_addr a2 = {};
-
-	return my_ipv6_addr_cmp(a1, &a2);
+	return a1->s6_addr32[0] == 0 &&
+	       a1->s6_addr32[1] == 0 &&
+	       a1->s6_addr32[2] == 0 &&
+	       a1->s6_addr32[3] == 0;
 }
 
 /* returns true if packet should be dropped; false to continue */
