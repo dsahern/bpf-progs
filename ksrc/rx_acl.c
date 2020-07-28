@@ -68,6 +68,11 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 
 	val = bpf_map_lookup_elem(acl_map, &key);
 	/* if no entry, pass */
+	if (!val) {
+		/* check for just protocol; maybe a sport ACL */
+		key.port = 0;
+		val = bpf_map_lookup_elem(acl_map, &key);
+	}
 	if (!val)
 		return false;
 
