@@ -342,7 +342,7 @@ static void usage(const char *prog)
 		"usage: %s [OPTS] -- acl-spec [acl-spec ...]\n"
 		"\nOPTS:\n"
 		"    -i id          add entry to map with given id\n"
-		"    -p path        use map add given path\n"
+		"    -p path        use map at given path\n"
 		"    -P             print acl entries in map\n"
 		"\n"
 		"acl-spec: [-][ipv4,|ipv6,]proto=...,daddr=...,dport=...,saddr=...,sport=...\n"
