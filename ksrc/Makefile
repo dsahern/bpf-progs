@@ -37,6 +37,8 @@ MODS += $(OBJDIR)pktdrop.o
 MODS += $(OBJDIR)pktlatency.o
 MODS += $(OBJDIR)ovslatency.o
 MODS += $(OBJDIR)net_rx_action.o
+MODS += $(OBJDIR)napi_poll.o
+MODS += $(OBJDIR)xdp_devmap_xmit.o
 
 MODS += $(OBJDIR)tcp_probe.o
 MODS += $(OBJDIR)xdp_l2fwd.o

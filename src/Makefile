@@ -27,6 +27,8 @@ MODS += $(BINDIR)netmon
 MODS += $(BINDIR)pktlatency
 MODS += $(BINDIR)ovslatency
 MODS += $(BINDIR)net_rx_action
+MODS += $(BINDIR)napi_poll
+MODS += $(BINDIR)xdp_devmap_xmit
 
 MODS += $(BINDIR)xdp_dummy
 MODS += $(BINDIR)vm_info
