@@ -81,7 +81,7 @@ int xdp_egress_prog(struct xdp_md *ctx)
 	if (!vi)
 		return XDP_PASS;
 
-        if (drop_packet(data, data_end, vi, idx, true, &fl, &__acl_map))
+        if (drop_packet(data, data_end, vi, true, &fl, &__acl_map))
 		return XDP_DROP;
 
 	/* don't redirect broadcast frames */

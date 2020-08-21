@@ -39,8 +39,8 @@ static __always_inline bool ipv6_any(const struct in6_addr *a1)
 
 /* returns true if packet should be dropped; false to continue */
 static __always_inline bool drop_packet(void *data, void *data_end,
-					struct vm_info *vi,
-					u32 dev_idx, bool rx, struct flow *fl,
+					struct vm_info *vi, bool rx,
+					struct flow *fl,
 					struct bpf_map_def *acl_map)
 {
 	struct ethhdr *eth = data;

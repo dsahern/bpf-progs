@@ -36,8 +36,7 @@ int tc_acl_vm_tx_prog(struct __sk_buff *skb)
 	if (!vi)
 		return TC_ACT_OK;
 
-	rc = drop_packet(data, data_end, vi, idx, false, &fl,
-			 &__tx_acl_map);
+	rc = drop_packet(data, data_end, vi, false, &fl, &__tx_acl_map);
 	return rc ? TC_ACT_SHOT : TC_ACT_OK;
 }
 
@@ -55,7 +54,7 @@ int xdp_acl_vm_tx_prog(struct xdp_md *ctx)
 	if (!vi)
 		return XDP_PASS;
 
-	rc = drop_packet(data, data_end, vi, idx, false, &fl, &__tx_acl_map);
+	rc = drop_packet(data, data_end, vi, false, &fl, &__tx_acl_map);
 
 	return rc ? XDP_DROP : XDP_PASS;
 }
