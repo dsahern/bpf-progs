@@ -18,13 +18,6 @@
 #include "vm_info.h"
 #include "eth_helpers.h"
 
-#define XDP_ACL_DEBUG
-#ifdef XDP_ACL_DEBUG
-#include "bpf_debug.h"
-#else
-#define bpf_debug(...)
-#endif
-
 #include "flow.h"
 
 static __always_inline bool my_ipv6_addr_cmp(const struct in6_addr *a1,
@@ -57,28 +50,12 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	u16 h_proto;
 	int rc;
 
-	if (nh > data_end) {
-		if (rx) {
-			bpf_debug("ACL DROP: malformed packet from VM %u dev %u\n",
-				  vi->vmid, dev_idx);
-		} else {
-			bpf_debug("ACL DROP: malformed packet to VM %u dev %u\n",
-				  vi->vmid, dev_idx);
-		}
+	if (nh > data_end)
 		return true;
-	}
 
 	/* direction: Tx = to VM, Rx = from VM */
-	if (!mac_cmp(vi->mac, rx ? eth->h_source : eth->h_dest)) {
-		if (rx) {
-			bpf_debug("ACL DROP: mac mismatch on packet from VM %u dev %u\n",
-				  vi->vmid, dev_idx);
-		} else {
-			bpf_debug("ACL DROP: mac mismatch on packet from VM %u dev %u\n",
-				  vi->vmid, dev_idx);
-		}
+	if (!mac_cmp(vi->mac, rx ? eth->h_source : eth->h_dest))
 		return true;
-	}
 
 	h_proto = eth->h_proto;
 #ifdef SUPPORT_QINQ
@@ -167,23 +144,8 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 		}
 	}
 
-	if (val->port && val->port == fl->ports.sport) {
-		if (rx) {
-			bpf_debug("ACL DROP: from VM %u by rule, sport match dev %u\n",
-				  vi->vmid, dev_idx);
-		} else {
-			bpf_debug("ACL DROP: to VM %u by rule, sport match dev %u\n",
-				  vi->vmid, dev_idx);
-		}
+	if (val->port && val->port == fl->ports.sport)
 		return true;
-	}
 
-	if (rx) {
-		bpf_debug("ACL DROP: from VM %u by rule, dport,protocol match dev %u\n",
-			  vi->vmid, dev_idx);
-	} else {
-		bpf_debug("ACL DROP: to VM %u by rule, dport,protocol match dev %u\n",
-			  vi->vmid, dev_idx);
-	}
 	return true;
 }
