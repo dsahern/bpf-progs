@@ -193,29 +193,11 @@ static void print_flags(__u8 flags)
 
 }
 
-static int print_addr(struct acl_val *val, bool daddr)
+static int print_addr(void *addr, __u8 family)
 {
-	struct in6_addr in6;
-	struct in_addr in;
 	char addrstr[64];
-	int n;
 
-	n = printf("%s=", daddr ? "daddr" : "saddr");
-
-	switch(val->family) {
-	case AF_INET:
-		in.s_addr = daddr ? val->daddr.ipv4 : val->saddr.ipv4;
-		n += printf("%s",
-			    inet_ntop(AF_INET, &in, addrstr, sizeof(addrstr)));
-		break;
-	case AF_INET6:
-		in6 = daddr ? val->daddr.ipv6 : val->saddr.ipv6;
-		n += printf("%s",
-			    inet_ntop(AF_INET6, &in6, addrstr, sizeof(addrstr)));
-		break;
-        }
-
-	return n;
+	return printf("%s", inet_ntop(family, addr, addrstr, sizeof(addrstr)));
 }
 
 static int print_protocol(__u8  protocol)
@@ -264,7 +246,8 @@ static void dump_entry(struct acl_key *key, struct acl_val *val)
 
 	if (val->flags & ACL_FLAG_DADDR_CHECK) {
 		if (n) printf(",");
-		n += print_addr(val, true);
+		n += printf("daddr=");
+		n += print_addr(&val->daddr, val->family);
 	}
 
 	if (key->port) {
@@ -274,7 +257,8 @@ static void dump_entry(struct acl_key *key, struct acl_val *val)
 
 	if (val->flags & ACL_FLAG_SADDR_CHECK) {
 		if (n) printf(",");
-		n += print_addr(val, false);
+		n += printf("saddr=");
+		n += print_addr(&val->saddr, val->family);
 	}
 
 	if (val->port) {
