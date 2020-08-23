@@ -15,9 +15,7 @@
 #include <bpf/bpf_helpers.h>
 
 #include "xdp_acl.h"
-#include "eth_helpers.h"
-#include "ipv6_helpers.h"
-#include "flow.h"
+#include "acl_vm_common.h"
 
 struct bpf_map_def SEC("maps") rx_acl_map = {
 	.type = BPF_MAP_TYPE_HASH,
@@ -25,84 +23,6 @@ struct bpf_map_def SEC("maps") rx_acl_map = {
 	.value_size = sizeof(struct acl_val),
 	.max_entries = 64,
 };
-
-/* returns true if packet should be dropped; false to continue */
-static __always_inline bool drop_packet(void *data, void *data_end,
-					struct flow *fl,
-					struct bpf_map_def *acl_map)
-{
-	struct ethhdr *eth = data;
-	struct acl_key key = {};
-	struct acl_val *val;
-	void *nh = eth + 1;
-	u16 h_proto;
-	int rc;
-
-	if (nh > data_end)
-		return true;
-
-	if (eth->h_proto == htons(ETH_P_8021Q)) {
-		struct vlan_hdr *vhdr = nh;
-
-		if (vhdr + 1 > data_end)
-			return XDP_DROP; // malformed packet
-
-		h_proto = vhdr->h_vlan_encapsulated_proto;
-		nh = vhdr + 1;
-	} else {
-		h_proto = eth->h_proto;
-	}
-
-	rc = parse_pkt(fl, h_proto, nh, data_end, 0);
-	if (rc)
-		return rc > 0 ? false : true;
-
-	key.protocol = fl->protocol;
-	if (key.protocol == IPPROTO_TCP || key.protocol == IPPROTO_UDP)
-		key.port = fl->ports.dport;
-
-	val = bpf_map_lookup_elem(acl_map, &key);
-	/* if no entry, pass */
-	if (!val) {
-		/* check for just protocol; maybe a sport ACL */
-		key.port = 0;
-		val = bpf_map_lookup_elem(acl_map, &key);
-	}
-	if (!val)
-		return false;
-
-	/* action on hit */
-	if (val->family) {
-		if (fl->family != val->family)
-			return false;
-	} else if (val->flags & ACL_FLAG_ADDR_CHECK) {
-		if (fl->family != val->family)
-			return false;
-	}
-	if (val->flags & ACL_FLAG_ADDR_CHECK) {
-		switch(fl->family) {
-		case AF_INET:
-			if (!val->addr.ipv4)
-				return true;
-			if (fl->daddr.ipv4 != val->addr.ipv4)
-				return false;
-			break;
-		case AF_INET6:
-			if (ipv6_any(&val->addr.ipv6))
-				return true;
-			if (!my_ipv6_addr_cmp(&fl->daddr.ipv6, &val->addr.ipv6))
-				return false;
-			break;
-		default:
-			return false;
-		}
-	}
-
-	if (val->port && val->port == fl->ports.sport)
-		return true;
-
-	return key.port ? true : false;
-}
 
 SEC("classifier/rx_acl")
 int tc_acl_rx_prog(struct __sk_buff *skb)
@@ -113,7 +33,7 @@ int tc_acl_rx_prog(struct __sk_buff *skb)
 	struct flow fl = {};
 	bool rc;
 
-	rc = drop_packet(data, data_end, &fl, &rx_acl_map);
+	rc = drop_packet(data, data_end, NULL, true, &fl, &rx_acl_map);
 
 	return rc ? TC_ACT_SHOT : TC_ACT_OK;
 }
@@ -126,7 +46,7 @@ int xdp_rx_acl_prog(struct xdp_md *ctx)
 	struct flow fl = {};
 	bool rc;
 
-	rc = drop_packet(data, data_end, &fl, &rx_acl_map);
+	rc = drop_packet(data, data_end, NULL, true, &fl, &rx_acl_map);
 
 	return rc ? XDP_DROP : XDP_PASS;
 }

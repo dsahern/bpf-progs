@@ -92,12 +92,11 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	u16 h_proto;
 	int ret;
 
-
 	if (nh > data_end)
 		return true;
 
 	/* direction: Tx = to VM, Rx = from VM */
-	if (!mac_cmp(vi->mac, rx ? eth->h_source : eth->h_dest))
+	if (vi && !mac_cmp(vi->mac, rx ? eth->h_source : eth->h_dest))
 		return true;
 
 	h_proto = eth->h_proto;
