@@ -44,7 +44,7 @@ static __always_inline bool ipv6_any(const struct in6_addr *a1)
 
 /* returns true if packet should be dropped; false to continue */
 static __always_inline bool drop_packet(void *data, void *data_end,
-					u32 dev_idx, struct flow *fl,
+					struct flow *fl,
 					struct bpf_map_def *acl_map)
 {
 	struct ethhdr *eth = data;
@@ -57,7 +57,18 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	if (nh > data_end)
 		return true;
 
-	h_proto = eth->h_proto;
+	if (eth->h_proto == htons(ETH_P_8021Q)) {
+		struct vlan_hdr *vhdr = nh;
+
+		if (vhdr + 1 > data_end)
+			return XDP_DROP; // malformed packet
+
+		h_proto = vhdr->h_vlan_encapsulated_proto;
+		nh = vhdr + 1;
+	} else {
+		h_proto = eth->h_proto;
+	}
+
 	rc = parse_pkt(fl, h_proto, nh, data_end, 0);
 	if (rc)
 		return rc > 0 ? false : true;
@@ -80,40 +91,22 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	if (val->family) {
 		if (fl->family != val->family)
 			return false;
-	} else if (val->flags & (ACL_FLAG_SADDR_CHECK | ACL_FLAG_DADDR_CHECK)) {
+	} else if (val->flags & ACL_FLAG_ADDR_CHECK) {
 		if (fl->family != val->family)
 			return false;
 	}
-	if (val->flags & ACL_FLAG_SADDR_CHECK) {
+	if (val->flags & ACL_FLAG_ADDR_CHECK) {
 		switch(fl->family) {
 		case AF_INET:
-			if (!val->saddr.ipv4)
+			if (!val->addr.ipv4)
 				return true;
-			if (fl->saddr.ipv4 != val->saddr.ipv4)
+			if (fl->daddr.ipv4 != val->addr.ipv4)
 				return false;
 			break;
 		case AF_INET6:
-			if (ipv6_any(&val->saddr.ipv6))
+			if (ipv6_any(&val->addr.ipv6))
 				return true;
-			if (!my_ipv6_addr_cmp(&fl->saddr.ipv6, &val->saddr.ipv6))
-				return false;
-			break;
-		default:
-			return false;
-		}
-	}
-	if (val->flags & ACL_FLAG_DADDR_CHECK) {
-		switch(fl->family) {
-		case AF_INET:
-			if (!val->daddr.ipv4)
-				return true;
-			if (fl->daddr.ipv4 != val->daddr.ipv4)
-				return false;
-			break;
-		case AF_INET6:
-			if (ipv6_any(&val->daddr.ipv6))
-				return true;
-			if (!my_ipv6_addr_cmp(&fl->daddr.ipv6, &val->daddr.ipv6))
+			if (!my_ipv6_addr_cmp(&fl->daddr.ipv6, &val->addr.ipv6))
 				return false;
 			break;
 		default:
@@ -124,7 +117,7 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	if (val->port && val->port == fl->ports.sport)
 		return true;
 
-	return true;
+	return key.port ? true : false;
 }
 
 SEC("classifier/rx_acl")
@@ -136,7 +129,7 @@ int tc_acl_rx_prog(struct __sk_buff *skb)
 	struct flow fl = {};
 	bool rc;
 
-	rc = drop_packet(data, data_end, idx, &fl, &rx_acl_map);
+	rc = drop_packet(data, data_end, &fl, &rx_acl_map);
 
 	return rc ? TC_ACT_SHOT : TC_ACT_OK;
 }
@@ -146,11 +139,10 @@ int xdp_rx_acl_prog(struct xdp_md *ctx)
 {
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
-	u32 idx = ctx->ingress_ifindex;
 	struct flow fl = {};
 	bool rc;
 
-	rc = drop_packet(data, data_end, idx, &fl, &rx_acl_map);
+	rc = drop_packet(data, data_end, &fl, &rx_acl_map);
 
 	return rc ? XDP_DROP : XDP_PASS;
 }

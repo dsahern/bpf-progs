@@ -38,7 +38,7 @@ static __always_inline bool ipv6_any(const struct in6_addr *a1)
 }
 
 static __always_inline bool check_acl(struct ethhdr *eth, struct flow *fl,
-				      struct bpf_map_def *acl_map)
+				      bool use_src, struct bpf_map_def *acl_map)
 {
 	struct acl_key key = {};
 	struct acl_val *val;
@@ -61,40 +61,29 @@ static __always_inline bool check_acl(struct ethhdr *eth, struct flow *fl,
 	if (val->family) {
 		if (fl->family != val->family)
 			return false;
-	} else if (val->flags & (ACL_FLAG_SADDR_CHECK | ACL_FLAG_DADDR_CHECK)) {
+	} else if (val->flags & ACL_FLAG_ADDR_CHECK) {
 		if (fl->family != val->family)
 			return false;
 	}
-	if (val->flags & ACL_FLAG_SADDR_CHECK) {
+	if (val->flags & ACL_FLAG_ADDR_CHECK) {
+		struct in6_addr *v6addr;
+		__be32 v4addr;
+
 		switch(fl->family) {
 		case AF_INET:
-			if (!val->saddr.ipv4)
+			if (!val->addr.ipv4)
 				return true;
-			if (fl->saddr.ipv4 != val->saddr.ipv4)
+
+			v4addr = use_src ? fl->saddr.ipv4 : fl->daddr.ipv4;
+			if (v4addr != val->addr.ipv4)
 				return false;
 			break;
 		case AF_INET6:
-			if (ipv6_any(&val->saddr.ipv6))
+			if (ipv6_any(&val->addr.ipv6))
 				return true;
-			if (!my_ipv6_addr_cmp(&fl->saddr.ipv6, &val->saddr.ipv6))
-				return false;
-			break;
-		default:
-			return false;
-		}
-	}
-	if (val->flags & ACL_FLAG_DADDR_CHECK) {
-		switch(fl->family) {
-		case AF_INET:
-			if (!val->daddr.ipv4)
-				return true;
-			if (fl->daddr.ipv4 != val->daddr.ipv4)
-				return false;
-			break;
-		case AF_INET6:
-			if (ipv6_any(&val->daddr.ipv6))
-				return true;
-			if (!my_ipv6_addr_cmp(&fl->daddr.ipv6, &val->daddr.ipv6))
+
+			v6addr = use_src ? &fl->saddr.ipv6 : &fl->daddr.ipv6;
+			if (!my_ipv6_addr_cmp(v6addr, &val->addr.ipv6))
 				return false;
 			break;
 		default:
@@ -156,8 +145,11 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	if (ret)
 		return ret > 0 ? false : true;
 
+	/* Rx = from VM: check dest address against ACL
+	 * Tx = to VM: check source address against ACL
+	 */
 	if (acl_map)
-		rc = check_acl(eth, fl, acl_map);
+		rc = check_acl(eth, fl, !rx, acl_map);
 
 	return rc;
 }

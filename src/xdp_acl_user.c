@@ -65,7 +65,7 @@ static int parse_port(const char *arg, __be16 *port)
 	return 0;
 }
 
-static int parse_addr(const char *arg, struct acl_val *val, bool src)
+static int parse_addr(const char *arg, struct acl_val *val)
 {
 	if (*arg == '\0')
 		return 0;
@@ -79,12 +79,8 @@ static int parse_addr(const char *arg, struct acl_val *val, bool src)
 			fprintf(stderr, "Invalid IPv6 address\n");
 			return -1;
 		}
-		if (memcmp(&in6, &any_in6, sizeof(any_in6))) {
-			if (src)
-				val->saddr.ipv6 = in6;
-			else
-				val->daddr.ipv6 = in6;
-		}
+		if (memcmp(&in6, &any_in6, sizeof(any_in6)))
+			val->addr.ipv6 = in6;
 	} else {
 		struct in_addr in;
 
@@ -94,18 +90,14 @@ static int parse_addr(const char *arg, struct acl_val *val, bool src)
 			return -1;
 		}
 
-		if (in.s_addr) {
-			if (src)
-				val->saddr.ipv4 = in.s_addr;
-			else
-				val->daddr.ipv4 = in.s_addr;
-		}
+		if (in.s_addr)
+			val->addr.ipv4 = in.s_addr;
 	}
 
 	return 0;
 }
 
-/* acl-spec: proto=...,daddr=...,dport=...,saddr=...,sport=... */
+/* acl-spec: proto=...,addr=...,dport=...,sport=... */
 static int handle_acl_entry(const char *_arg, int map_fd)
 {
 	struct acl_key key = {};
@@ -141,20 +133,16 @@ static int handle_acl_entry(const char *_arg, int map_fd)
 		} else if (strncmp(p, "proto=", 6) == 0) {
 			p += 6;
 			err = parse_proto(p, &key.protocol);
-		} else if (strncmp(p, "daddr=", 6) == 0) {
-			p += 6;
-			err = parse_addr(p, &val, false);
-			val.flags |= ACL_FLAG_DADDR_CHECK;
 		} else if (strncmp(p, "dport=", 6) == 0) {
 			p += 6;
 			err = parse_port(p, &key.port);
 		} else if (strncmp(p, "sport=", 6) == 0) {
 			p += 6;
 			err = parse_port(p, &val.port);
-		} else if (strncmp(p, "saddr=", 6) == 0) {
+		} else if (strncmp(p, "addr=", 6) == 0) {
 			p += 6;
-			err = parse_addr(p, &val, true);
-			val.flags |= ACL_FLAG_SADDR_CHECK;
+			err = parse_addr(p, &val);
+			val.flags |= ACL_FLAG_ADDR_CHECK;
 		} else {
 			printf("unknown keyword\n");
 			err = -EINVAL;
@@ -185,11 +173,8 @@ static void print_flags(__u8 flags)
 
 	printf("    flags:");
 
-	if (flags & ACL_FLAG_SADDR_CHECK)
-		printf(" SADDR");
-
-	if (flags & ACL_FLAG_DADDR_CHECK)
-		printf(" DADDR");
+	if (flags & ACL_FLAG_ADDR_CHECK)
+		printf(" ADDR");
 
 }
 
@@ -244,21 +229,15 @@ static void dump_entry(struct acl_key *key, struct acl_val *val)
 		n += print_protocol(key->protocol);
 	}
 
-	if (val->flags & ACL_FLAG_DADDR_CHECK) {
+	if (val->flags & ACL_FLAG_ADDR_CHECK) {
 		if (n) printf(",");
-		n += printf("daddr=");
-		n += print_addr(&val->daddr, val->family);
+		n += printf("addr=");
+		n += print_addr(&val->addr, val->family);
 	}
 
 	if (key->port) {
 		if (n) printf(",");
 		n += printf("dport=%u", ntohs(key->port));
-	}
-
-	if (val->flags & ACL_FLAG_SADDR_CHECK) {
-		if (n) printf(",");
-		n += printf("saddr=");
-		n += print_addr(&val->saddr, val->family);
 	}
 
 	if (val->port) {
@@ -329,7 +308,7 @@ static void usage(const char *prog)
 		"    -p path        use map at given path\n"
 		"    -P             print acl entries in map\n"
 		"\n"
-		"acl-spec: [-][ipv4,|ipv6,]proto=...,daddr=...,dport=...,saddr=...,sport=...\n"
+		"acl-spec: [-][ipv4,|ipv6,]proto=...,addr=...,dport=...,sport=...\n"
 		"          if first word starts with '-', rule is deleted\n"
 		, prog);
 }
