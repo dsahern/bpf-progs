@@ -37,7 +37,7 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	void *data_end = (void *)(long)ctx->data_end;
 	void *data = (void *)(long)ctx->data;
 	struct bpf_devmap_val *entry;
-	struct vlan_hdr *vhdr;
+	struct vlan_hdr *vhdr = NULL;
 	struct ethhdr *eth;
 	struct fdb_key key;
 	u8 smac[ETH_ALEN];
@@ -53,20 +53,16 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	if (nh > data_end)
 		return XDP_DROP; // malformed packet
 
-	/* expecting VLAN tag for VM traffic, but not Q-in-Q */
-	if (eth->h_proto != htons(ETH_P_8021Q))
-		return XDP_PASS;
-
-	vhdr = nh;
-	if (vhdr + 1 > data_end)
-		return XDP_DROP; // malformed packet
-
 	__builtin_memset(&key, 0, sizeof(key));
-	key.vlan = ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK;
-	if (key.vlan == 0)
-		return XDP_PASS;
-
 	__builtin_memcpy(key.mac, eth->h_dest, ETH_ALEN);
+
+	if (eth->h_proto == htons(ETH_P_8021Q)) {
+		vhdr = nh;
+		if (vhdr + 1 > data_end)
+			return XDP_DROP; // malformed packet
+
+		key.vlan = ntohs(vhdr->h_vlan_TCI) & VLAN_VID_MASK;
+	}
 
 	entry = bpf_map_lookup_elem(&fdb_map, &key);
 	if (!entry || entry->ifindex == 0)
@@ -76,23 +72,25 @@ int xdp_l2fwd_prog(struct xdp_md *ctx)
 	if (!bpf_map_lookup_elem(&xdp_fwd_ports, &entry->ifindex))
 		return XDP_PASS;
 
-	/* remove VLAN header before hand off to VM */
-	h_proto = vhdr->h_vlan_encapsulated_proto;
-	__builtin_memcpy(smac, eth->h_source, ETH_ALEN);
+	if (vhdr) {
+		/* remove VLAN header before hand off to VM */
+		h_proto = vhdr->h_vlan_encapsulated_proto;
+		__builtin_memcpy(smac, eth->h_source, ETH_ALEN);
 
-	if (bpf_xdp_adjust_head(ctx, sizeof(*vhdr)))
-		return XDP_PASS;
+		if (bpf_xdp_adjust_head(ctx, sizeof(*vhdr)))
+			return XDP_PASS;
 
-	/* reset data pointers after adjust */
-	data = (void *)(long)ctx->data;
-	data_end = (void *)(long)ctx->data_end;
-	eth = data;
-	if (eth + 1 > data_end)
-		return XDP_DROP;
+		/* reset data pointers after adjust */
+		data = (void *)(long)ctx->data;
+		data_end = (void *)(long)ctx->data_end;
+		eth = data;
+		if (eth + 1 > data_end)
+			return XDP_DROP;
 
-	__builtin_memcpy(eth->h_dest, key.mac, ETH_ALEN);
-	__builtin_memcpy(eth->h_source, smac, ETH_ALEN);
-	eth->h_proto = h_proto;
+		__builtin_memcpy(eth->h_dest, key.mac, ETH_ALEN);
+		__builtin_memcpy(eth->h_source, smac, ETH_ALEN);
+		eth->h_proto = h_proto;
+	}
 
 	return bpf_redirect_map(&xdp_fwd_ports, entry->ifindex, 0);
 }
