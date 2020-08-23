@@ -6,7 +6,7 @@
 #define KBUILD_MODNAME "acl_vm_tx"
 #include <uapi/linux/bpf.h>
 
-#include "acl_vm_common.h"
+#include "acl_simple.h"
 
 struct bpf_map_def SEC("maps") __tx_acl_map = {
 	.type = BPF_MAP_TYPE_HASH,

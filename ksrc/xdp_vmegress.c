@@ -12,7 +12,7 @@
 #include <bpf/bpf_helpers.h>
 
 #include "xdp_vlan.h"
-#include "acl_vm_common.h"
+#include "acl_simple.h"
 
 /* TO-DO: pull this from a map */
 #define EGRESS_ETH0   2

@@ -20,7 +20,7 @@
 #include "ipv6_helpers.h"
 #include "flow.h"
 
-static __always_inline bool check_acl(struct ethhdr *eth, struct flow *fl,
+static __always_inline bool acl_simple(struct ethhdr *eth, struct flow *fl,
 				      bool use_src, struct bpf_map_def *acl_map)
 {
 	struct acl_key key = {};
@@ -131,7 +131,7 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	 * Tx = to VM: check source address against ACL
 	 */
 	if (acl_map)
-		rc = check_acl(eth, fl, !rx, acl_map);
+		rc = acl_simple(eth, fl, !rx, acl_map);
 
 	return rc;
 }
