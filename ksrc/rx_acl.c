@@ -16,7 +16,7 @@
 
 #include "xdp_acl.h"
 #include "eth_helpers.h"
-
+#include "ipv6_helpers.h"
 #include "flow.h"
 
 struct bpf_map_def SEC("maps") rx_acl_map = {
@@ -25,22 +25,6 @@ struct bpf_map_def SEC("maps") rx_acl_map = {
 	.value_size = sizeof(struct acl_val),
 	.max_entries = 64,
 };
-
-static __always_inline bool my_ipv6_addr_cmp(const struct in6_addr *a1,
-					     const struct in6_addr *a2)
-{
-	return a1->s6_addr32[0] == a2->s6_addr32[0] &&
-	       a1->s6_addr32[1] == a2->s6_addr32[1] &&
-	       a1->s6_addr32[2] == a2->s6_addr32[2] &&
-	       a1->s6_addr32[3] == a2->s6_addr32[3];
-}
-
-static __always_inline bool ipv6_any(const struct in6_addr *a1)
-{
-	struct in6_addr a2 = {};
-
-	return my_ipv6_addr_cmp(a1, &a2);
-}
 
 /* returns true if packet should be dropped; false to continue */
 static __always_inline bool drop_packet(void *data, void *data_end,

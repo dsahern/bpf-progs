@@ -17,25 +17,8 @@
 #include "xdp_acl.h"
 #include "vm_info.h"
 #include "eth_helpers.h"
-
+#include "ipv6_helpers.h"
 #include "flow.h"
-
-static __always_inline bool my_ipv6_addr_cmp(const struct in6_addr *a1,
-					     const struct in6_addr *a2)
-{
-	return a1->s6_addr32[0] == a2->s6_addr32[0] &&
-	       a1->s6_addr32[1] == a2->s6_addr32[1] &&
-	       a1->s6_addr32[2] == a2->s6_addr32[2] &&
-	       a1->s6_addr32[3] == a2->s6_addr32[3];
-}
-
-static __always_inline bool ipv6_any(const struct in6_addr *a1)
-{
-	return a1->s6_addr32[0] == 0 &&
-	       a1->s6_addr32[1] == 0 &&
-	       a1->s6_addr32[2] == 0 &&
-	       a1->s6_addr32[3] == 0;
-}
 
 static __always_inline bool check_acl(struct ethhdr *eth, struct flow *fl,
 				      bool use_src, struct bpf_map_def *acl_map)
