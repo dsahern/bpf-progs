@@ -66,7 +66,7 @@ CFLAGS += -Wno-tautological-compare
 CFLAGS += -Wno-unknown-warning-option
 
 INCLUDES  = -I../include
-INCLUDES += -I$(LIBBPF_PATH)/usr/include
+INCLUDES += -I../libbpf/usr/include
 INCLUDES += -I$(KDIR)/arch/x86/include
 INCLUDES += -I$(BDIR)/arch/x86/include/generated
 INCLUDES += -I$(BDIR)/include 
