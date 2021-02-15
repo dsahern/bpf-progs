@@ -251,6 +251,7 @@ static void usage(const char *prog)
 		"    -r             remove entries\n"
 		"    -p progid      bpf program id or pinned path to attach to entry\n"
 		"    -P             print map entries\n"
+		"    -C             print map entries in command line format\n"
 		, prog);
 }
 
