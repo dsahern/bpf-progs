@@ -4,14 +4,6 @@
 
 #include <bpf/libbpf.h>
 
-enum bpf_obj_type {
-	BPF_OBJ_UNKNOWN,
-	BPF_OBJ_PROG,
-	BPF_OBJ_MAP,
-	BPF_OBJ_LINK,
-	BPF_OBJ_BTF,
-};
-
 int load_obj_file(struct bpf_prog_load_attr *attr,
                   struct bpf_object **obj,
                   const char *objfile, bool user_set);
