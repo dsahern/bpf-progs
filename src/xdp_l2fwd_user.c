@@ -1,4 +1,4 @@
-/* Copyright (c) 2019-20 David Ahern <dsahern@gmail.com>
+/* Copyright (c) 2019-21 David Ahern <dsahern@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of version 2 of the GNU General Public
@@ -249,13 +249,13 @@ static void usage(const char *prog)
 	fprintf(stderr,
 		"usage: %s [OPTS]\n"
 		"\nOPTS:\n"
-		"    -f id          fdb map id\n"
-		"    -t id          devmap id for tx ports\n"
+		"    -f id          fdb map id or pinned path\n"
+		"    -t id          devmap id or pinned path for tx ports\n"
 		"    -d device      device to redirect\n"
 		"    -m mac         mac address for entry\n"
 		"    -v vlan        vlan for entry\n"
 		"    -r             remove entries\n"
-		"    -p progid      bpf program id to attach to entry\n"
+		"    -p progid      bpf program id or pinned path to attach to entry\n"
 		"    -P             print map entries\n"
 		, prog);
 }
@@ -264,7 +264,9 @@ int main(int argc, char **argv)
 {
 	struct bpf_devmap_val pval = { .bpf_prog.fd = -1 };
 	__u32 fdb_id = 0, ports_id = 0, bpf_prog_id = 0;
+	const char *ports_map_path = NULL;
 	const char *bpf_prog_path = NULL;
+	const char *fdb_map_path = NULL;
 	bool print_entries = false;
 	struct fdb_key key = {};
 	int fdb_fd, ports_fd;
@@ -276,18 +278,24 @@ int main(int argc, char **argv)
 	while ((opt = getopt(argc, argv, ":f:t:d:m:v:p:rPC")) != -1) {
 		switch (opt) {
 		case 'f':
-			if (str_to_ulong(optarg, &tmp)) {
-				fprintf(stderr, "Invalid map id\n");
+			if (str_to_ulong(optarg, &tmp) == 0) {
+				fdb_id = (__u32)tmp;
+			} else if (*optarg == '/') {
+				fdb_map_path = optarg;
+			} else {
+				fprintf(stderr, "Invalid fdb map id\n");
 				return 1;
 			}
-			fdb_id = (__u32)tmp;
 			break;
 		case 't':
-			if (str_to_ulong(optarg, &tmp)) {
-				fprintf(stderr, "Invalid map id\n");
+			if (str_to_ulong(optarg, &tmp) == 0) {
+				ports_id = (__u32)tmp;
+			} else if (*optarg == '/') {
+				ports_map_path = optarg;
+			} else {
+				fprintf(stderr, "Invalid ports map id\n");
 				return 1;
 			}
-			ports_id = (__u32)tmp;
 			break;
 		case 'd':
 			pval.ifindex = if_nametoindex(optarg);
@@ -318,7 +326,7 @@ int main(int argc, char **argv)
 			} else if (*optarg == '/') {
 				bpf_prog_path = optarg;
 			} else {
-				fprintf(stderr, "Invalid program id: '%s'\n", optarg);
+				fprintf(stderr, "Invalid program id\n");
 				return 1;
 			}
 			break;
@@ -337,71 +345,27 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (fdb_id) {
-		fdb_fd = bpf_map_get_fd_by_id(fdb_id);
-		if (fdb_fd < 0 && errno != ENOENT) {
-			fprintf(stderr,
-				"Failed to get fd for fdb map id, %u: %s: %d\n",
-				fdb_id, strerror(errno), errno);
-			return 1;
-		}
-	} else {
-		fdb_fd = bpf_map_get_fd_by_name("fdb_map");
-		if (fdb_fd < 0 && errno != ENOENT) {
-			fprintf(stderr, "Failed to get fd for fdb map: %s: %d\n",
-				strerror(errno), errno);
-			return 1;
-		}
-	}
+	fdb_fd = bpf_map_get_fd(fdb_id, fdb_map_path, "fdb_map", "fdb map");
+	if (fdb_fd < 0)
+		return 1;
 
-	if (ports_id) {
-		ports_fd = bpf_map_get_fd_by_id(ports_id);
-		if (ports_fd < 0) {
-			fprintf(stderr,
-				"Failed to get fd for ports map id, %u: %s: %d\n",
-				ports_id, strerror(errno), errno);
-			return 1;
-		}
-	} else {
-		ports_fd = bpf_map_get_fd_by_name("xdp_fwd_ports");
-		if (ports_fd < 0) {
-			fprintf(stderr,
-				"Failed to get fd for ports map id, %u: %s: %d\n",
-				ports_id, strerror(errno), errno);
-			return 1;
-		}
-	}
+	ports_fd = bpf_map_get_fd(ports_id, ports_map_path, "xdp_fwd_ports",
+				  "ports map");
+	if (ports_fd < 0)
+		return 1;
 
 	if (cli_arg)
 		return show_entries_cli(fdb_fd, ports_fd);
 
 	if (print_entries) {
-		if (fdb_fd > 0)
-			ret = show_fdb_entries(fdb_fd);
-		else
-			ret = 0;
-
+		ret = show_fdb_entries(fdb_fd);
 		return show_ports_entries(ports_fd) ? : ret;
 	}
 
-	if (fdb_fd < 0)
+	pval.bpf_prog.fd = bpf_prog_get_fd(bpf_prog_id, bpf_prog_path, NULL,
+					   "redirect program");
+	if (pval.bpf_prog.fd < 0)
 		return 1;
-
-	if (bpf_prog_id) {
-		pval.bpf_prog.fd = bpf_prog_get_fd_by_id(bpf_prog_id);
-		if (pval.bpf_prog.fd < 0) {
-			fprintf(stderr, "Failed to get fd for prog id: %s: %d\n",
-				strerror(errno), errno);
-			return 1;
-		}
-	} else if (bpf_prog_path) {
-		pval.bpf_prog.fd = bpf_prog_get_fd_by_path(bpf_prog_path);
-		if (pval.bpf_prog.fd < 0) {
-			fprintf(stderr, "Failed to get fd for program: %s: %d\n",
-				strerror(errno), errno);
-			return 1;
-		}
-	}
 
 	if (!pval.ifindex) {
 		fprintf(stderr, "Device index not given\n");
