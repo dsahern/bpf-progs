@@ -4,7 +4,6 @@ include ../config.mk
 ifeq ($(KVER),)
 KVER=$(shell uname -r)
 endif
-KMAJ=$(shell echo $(KVER) | awk -F'.' '{print $$1}')
 
 ifeq ($(KDIR),)
 KDIR=$(shell ../utils/get_path.sh -r $(KVER) -k)
