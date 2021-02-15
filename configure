@@ -61,6 +61,8 @@ check_zlib()
 
 libbpf_compile_test()
 {
+	local libs="$*"
+
         cat >$TMPDIR/libbpftest.c <<EOF
 #include <bpf/libbpf.h>
 int main(int argc, char **argv) {
@@ -75,7 +77,7 @@ int main(int argc, char **argv) {
 }
 EOF
 
-        libbpf_err=$($CC -o $TMPDIR/libbpftest $TMPDIR/libbpftest.c  $LIBBPF_CFLAGS -lbpf 2>&1)
+        libbpf_err=$($CC -o $TMPDIR/libbpftest $TMPDIR/libbpftest.c  $LIBBPF_CFLAGS $LIBBPF_LDLIBS $libs 2>&1)
 }
 
 check_libbpf()
