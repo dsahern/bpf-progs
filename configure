@@ -59,20 +59,8 @@ check_zlib()
     fi
 }
 
-check_libbpf()
+libbpf_compile_test()
 {
-    local libbpf_err
-
-    if [ "${FORCE_SUBMODULE_LIBBPF:-0}" -ne "1" ] && ${PKG_CONFIG} libbpf --exists || [ -n "$LIBBPF_DIR" ]; then
-
-        if [ -n "$LIBBPF_DIR" ]; then
-            LIBBPF_CFLAGS="-I${LIBBPF_DIR}/include -L${LIBBPF_DIR}/lib"
-            LIBBPF_LDLIBS="-lbpf"
-        else
-            LIBBPF_CFLAGS=$(${PKG_CONFIG} libbpf --cflags)
-            LIBBPF_LDLIBS=$(${PKG_CONFIG} libbpf --libs)
-        fi
-
         cat >$TMPDIR/libbpftest.c <<EOF
 #include <bpf/libbpf.h>
 int main(int argc, char **argv) {
@@ -88,6 +76,23 @@ int main(int argc, char **argv) {
 EOF
 
         libbpf_err=$($CC -o $TMPDIR/libbpftest $TMPDIR/libbpftest.c  $LIBBPF_CFLAGS -lbpf 2>&1)
+}
+
+check_libbpf()
+{
+    local libbpf_err
+
+    if [ "${FORCE_SUBMODULE_LIBBPF:-0}" -ne "1" ] && ${PKG_CONFIG} libbpf --exists || [ -n "$LIBBPF_DIR" ]; then
+
+        if [ -n "$LIBBPF_DIR" ]; then
+            LIBBPF_CFLAGS="-I${LIBBPF_DIR}/include -L${LIBBPF_DIR}/lib"
+            LIBBPF_LDLIBS="-lbpf"
+        else
+            LIBBPF_CFLAGS=$(${PKG_CONFIG} libbpf --cflags)
+            LIBBPF_LDLIBS=$(${PKG_CONFIG} libbpf --libs)
+        fi
+
+        libbpf_compile_test
         if [ "$?" -eq "0" ]; then
             echo "SYSTEM_LIBBPF:=y" >>$CONFIG
             echo 'CFLAGS += ' $LIBBPF_CFLAGS >> $CONFIG
