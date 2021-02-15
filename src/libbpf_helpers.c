@@ -2,7 +2,7 @@
 /*
  * convenience wrappers around libbpf functions
  *
- * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
+ * Copyright (c) 2019-2021 David Ahern <dsahern@gmail.com>
  */
 
 #include <linux/if_link.h>
@@ -143,6 +143,40 @@ int bpf_map_get_fd_by_path(const char *path)
 	return fd;
 }
 
+int bpf_map_get_fd(__u32 id, const char *path, const char *name,
+		   const char *desc)
+{
+	int fd = -1;
+
+	if (id) {
+		fd = bpf_map_get_fd_by_id(id);
+		if (fd < 0 && errno != ENOENT) {
+			fprintf(stderr,
+				"Failed to get fd for %s by id: %s: %d\n",
+				desc, strerror(errno), errno);
+			return -1;
+		}
+	} else if (path) {
+		fd = bpf_map_get_fd_by_path(path);
+		if (fd < 0) {
+			fprintf(stderr,
+				"Failed to get fd for %s by path: %s: %d\n",
+				desc, strerror(errno), errno);
+			return -1;
+		}
+	} else if (name) {
+		fd = bpf_map_get_fd_by_name(name);
+		if (fd < 0 && errno != ENOENT) {
+			fprintf(stderr,
+				"Failed to get fd for %s by expected name: %s: %d\n",
+				desc, strerror(errno), errno);
+			return -1;
+		}
+	}
+
+	return fd;
+}
+
 int bpf_prog_get_fd_by_path(const char *path)
 {
 	enum bpf_obj_type objtype;
@@ -160,6 +194,66 @@ int bpf_prog_get_fd_by_path(const char *path)
 		fprintf(stderr, "Path is not to a BPF program\n");
 		close(fd);
 		return -1;
+	}
+
+	return fd;
+}
+
+int bpf_prog_get_fd_by_name(const char *name)
+{
+	struct bpf_prog_info info = {};
+	__u32 len = sizeof(info);
+	__u32 id = 0;
+	int err, fd;
+
+	while (1) {
+		err = bpf_prog_get_next_id(id, &id);
+		if (err)
+			break;
+
+		fd = bpf_prog_get_fd_by_id(id);
+		if (fd < 0)
+			continue;
+
+		err = bpf_obj_get_info_by_fd(fd, &info, &len);
+		if (!err && strcmp(info.name, name) == 0)
+			return fd;
+
+		close(fd);
+	}
+
+	return -1;
+}
+
+int bpf_prog_get_fd(__u32 id, const char *path, const char *name,
+		    const char *desc)
+{
+	int fd = -1;
+
+	if (id) {
+		fd = bpf_prog_get_fd_by_id(id);
+		if (fd < 0 && errno != ENOENT) {
+			fprintf(stderr,
+				"Failed to get fd for %s by id: %s: %d\n",
+				desc, strerror(errno), errno);
+			return -1;
+		}
+	} else if (path) {
+		fd = bpf_prog_get_fd_by_path(path);
+		if (fd < 0) {
+			fprintf(stderr,
+				"Failed to get fd for %s by path: %s: %d\n",
+				desc, strerror(errno), errno);
+			return -1;
+		}
+	} else if (name) {
+		fd = bpf_prog_get_fd_by_name(name);
+		if (fd < 0 && errno != ENOENT) {
+			fprintf(stderr,
+				"Failed to get fd for %s by expected name: %s: %d\n",
+				desc, strerror(errno), errno);
+			return -1;
+		}
 	}
 
 	return fd;

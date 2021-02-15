@@ -10,8 +10,12 @@ int load_obj_file(struct bpf_prog_load_attr *attr,
 
 int bpf_map_get_fd_by_name(const char *name);
 int bpf_map_get_fd_by_path(const char *path);
+int bpf_map_get_fd(__u32 id, const char *path, const char *name,
+		   const char *desc);
 
 int bpf_prog_get_fd_by_path(const char *path);
+int bpf_prog_get_fd(__u32 id, const char *path, const char *name,
+		    const char *desc);
 
 int attach_to_dev_generic(int idx, int prog_fd, const char *dev);
 int detach_from_dev_generic(int idx, const char *dev);
