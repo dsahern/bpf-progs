@@ -40,6 +40,7 @@ CFLAGS += -Wno-gnu-variable-sized-type-not-at-end
 CFLAGS += -Wno-address-of-packed-member 
 CFLAGS += -Wno-tautological-compare 
 CFLAGS += -Wno-unknown-warning-option
+CFLAGS += -fno-stack-protector
 
 INCLUDES  = -I../include
 INCLUDES += -I../libbpf/usr/include
@@ -61,9 +62,6 @@ GCCVER=$(shell gcc -v 2>&1 | awk '{if ($$0 ~ /gcc version/) {ver=split($$3,n,"."
 GCC_INC=$(shell find /usr/lib/gcc/x86_64-*linux*/$(GCCVER) -name include)
 NOSTDINC_FLAGS = -nostdinc -isystem $(GCC_INC)
 
-# newer LLC?
-#LLC_FLAGS += -mattr=dwarfris
-
 all: build $(MODS)
 
 build:
@@ -72,7 +70,7 @@ build:
 $(OBJDIR)%.o: %.c
 	$(QUIET_CLANG)$(CLANG) $(NOSTDINC_FLAGS) $(INCLUDES) \
 		$(SINCLUDES) $(DEFS) $(CFLAGS) \
-		-O2 -emit-llvm -c $< -o $@.cl
+		-O2 -emit-llvm $(CLANG_FLAGS) -c $< -o $@.cl
 	$(QUIET_LLC)$(LLC) -march=bpf $(LLC_FLAGS) -filetype=obj -o $@ $@.cl
 	@rm $@.cl
 
