@@ -75,4 +75,4 @@ $(OBJDIR)%.o: %.c
 	@rm $@.cl
 
 clean:
-	@rm -rf $(OBJDIR) $(BINDIR)
+	@rm -rf $(OBJDIR)
