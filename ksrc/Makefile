@@ -1,17 +1,6 @@
 
 include ../config.mk
 
-ifeq ($(KVER),)
-KVER=$(shell uname -r)
-endif
-
-ifeq ($(KDIR),)
-KDIR=$(shell ../utils/get_path.sh -r $(KVER) -k)
-endif
-ifeq ($(BDIR),)
-BDIR=$(shell ../utils/get_path.sh -r $(KVER) -b)
-endif
-
 ifneq (,$(BUILDDIR))
 OBJDIR = $(BUILDDIR)/ksrc/obj/
 else
@@ -43,9 +32,6 @@ MODS += $(OBJDIR)rx_acl.o
 VPATH := .
 
 # rule is based on samples/bpf/Makefile
-CLANG = clang
-LLC = llc
-
 DEFS = -D__KERNEL__ -D__BPF_TRACING__  -D__TARGET_ARCH_x86 $(EXTRA_DEFS)
 
 CFLAGS += -Wno-unused-value -Wno-pointer-sign 
@@ -57,16 +43,16 @@ CFLAGS += -Wno-unknown-warning-option
 
 INCLUDES  = -I../include
 INCLUDES += -I../libbpf/usr/include
-INCLUDES += -I$(KDIR)/arch/x86/include
-INCLUDES += -I$(BDIR)/arch/x86/include/generated
-INCLUDES += -I$(BDIR)/include 
-INCLUDES += -I$(KDIR)/include 
-INCLUDES += -I$(KDIR)/arch/x86/include/uapi 
-INCLUDES += -I$(BDIR)/arch/x86/include/generated/uapi 
-INCLUDES += -I$(KDIR)/include/uapi 
-INCLUDES += -I$(BDIR)/include/generated/uapi 
+INCLUDES += -I$(KSRC)/arch/x86/include
+INCLUDES += -I$(KBLD)/arch/x86/include/generated
+INCLUDES += -I$(KBLD)/include
+INCLUDES += -I$(KSRC)/include
+INCLUDES += -I$(KSRC)/arch/x86/include/uapi
+INCLUDES += -I$(KBLD)/arch/x86/include/generated/uapi
+INCLUDES += -I$(KSRC)/include/uapi
+INCLUDES += -I$(KBLD)/include/generated/uapi
 
-SINCLUDES  = -include $(KDIR)/include/linux/kconfig.h
+SINCLUDES  = -include $(KSRC)/include/linux/kconfig.h
 SINCLUDES += -include include/asm_goto_workaround.h
 
 # this is to find stdarg.h. Ubuntu has this under x86_64-linux-gnu
