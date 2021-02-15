@@ -10,21 +10,15 @@
  * General Public License for more details.
  */
 
-#include <linux/bpf.h>
-#include <linux/if_link.h>
 #include <limits.h>
 #include <net/if.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
 #include <libgen.h>
-
 #include <bpf/bpf.h>
-#include <bpf/libbpf.h>
 
 #include "xdp_fdb.h"
 #include "str_utils.h"
