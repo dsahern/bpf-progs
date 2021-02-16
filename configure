@@ -80,19 +80,44 @@ EOF
         libbpf_err=$($CC -o $TMPDIR/libbpftest $TMPDIR/libbpftest.c  $LIBBPF_CFLAGS $LIBBPF_LDLIBS $libs 2>&1)
 }
 
+check_custom_libbpf()
+{
+    LIBBPF_CFLAGS="-I${LIBBPF_DIR}/usr/include"
+    LIBBPF_LDLIBS="$(find ${LIBBPF_DIR} -name libbpf.a)"
+
+    echo -n "ELF support: "
+    check_elf || exit 1
+
+    echo -n "zlib support: "
+    check_zlib || exit 1
+
+    libbpf_compile_test "${LDLIBS}"
+    if [ "$?" -eq "0" ]; then
+        echo "LIBBPF_DIR=${LIBBPF_DIR}" >> $CONFIG
+        echo "CFLAGS += $LIBBPF_CFLAGS" >> $CONFIG
+        echo "LDLIBS += $LIBBPF_LDLIBS $LDLIBS" >> $CONFIG
+
+        echo "libbpf support: custom install"
+        return 0
+    fi
+
+    echo "libbpf support: invalid custom install"
+    return 1
+}
+
 check_libbpf()
 {
     local libbpf_err
 
-    if [ "${FORCE_SUBMODULE_LIBBPF:-0}" -ne "1" ] && ${PKG_CONFIG} libbpf --exists || [ -n "$LIBBPF_DIR" ]; then
+    if [ -n "$LIBBPF_DIR" ]; then
+	    check_custom_libbpf
+	    return $?
+    fi
 
-        if [ -n "$LIBBPF_DIR" ]; then
-            LIBBPF_CFLAGS="-I${LIBBPF_DIR}/include -L${LIBBPF_DIR}/lib"
-            LIBBPF_LDLIBS="-lbpf"
-        else
-            LIBBPF_CFLAGS=$(${PKG_CONFIG} libbpf --cflags)
-            LIBBPF_LDLIBS=$(${PKG_CONFIG} libbpf --libs)
-        fi
+    echo -n "libbpf support: "
+    if [ "${FORCE_SUBMODULE_LIBBPF:-0}" -ne "1" ] && ${PKG_CONFIG} libbpf --exists; then
+        LIBBPF_CFLAGS=$(${PKG_CONFIG} libbpf --cflags)
+        LIBBPF_LDLIBS=$(${PKG_CONFIG} libbpf --libs)
 
         libbpf_compile_test
         if [ "$?" -eq "0" ]; then
@@ -198,8 +223,7 @@ quiet_config >> $CONFIG
 
 check_toolchain
 
-echo -n "libbpf support: "
-check_libbpf
+check_libbpf || exit 1
 
 find_kernel_path || exit 1
 
