@@ -167,24 +167,34 @@ check_libbpf()
 
 find_kernel_path()
 {
+	local ksrc
+	local kbld
+
 	: ${KVER:=$(uname -r)}
 
+	if [ "${KSRC}" != "" ]; then
+		ksrc="${KSRC}"
 	# Fedora, Redhat and custom kernels
-	if [ -e /lib/modules/${KVER}/source ]; then
-		echo "KSRC=/lib/modules/${KVER}/source" >> "$CONFIG"
+	elif [ -e /lib/modules/${KVER}/source ]; then
+		ksrc="/lib/modules/${KVER}/source"
+	# Ubuntu, Debian
 	elif [ -e /usr/src/linux-headers-${KVER} ]; then
-		echo "KSRC=/usr/src/linux-headers-${KVER}" >> "$CONFIG"
+		ksrc="/usr/src/linux-headers-${KVER}"
 	else
 		echo "Failed to find kernel source directory" >&2
 		return 1
 	fi
 
-	if [ -e /lib/modules/${KVER}/build ]; then
-		echo "KBLD=/lib/modules/${KVER}/build" >> "$CONFIG"
+	if [ "${KBLD}" != "" ]; then
+		kbld="${KBLD}"
+	elif [ -e /lib/modules/${KVER}/build ]; then
+		kbld="/lib/modules/${KVER}/build"
 	else
 		echo "Failed to find kernel build directory" >&2
 		return 1
 	fi
+	echo "KSRC=${ksrc}" >> "$CONFIG"
+	echo "KBLD=${kbld}" >> "$CONFIG"
 }
 
 quiet_config()
