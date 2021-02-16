@@ -38,7 +38,7 @@ check_elf()
         echo "yes"
 
         echo 'CFLAGS += -DHAVE_ELF' `${PKG_CONFIG} libelf --cflags` >> $CONFIG
-        echo 'LDLIBS += ' `${PKG_CONFIG} libelf --libs` >>$CONFIG
+        LDLIBS="$LDLIBS $(${PKG_CONFIG} libelf --libs)"
     else
         echo "missing - this is required"
         return 1
@@ -52,7 +52,7 @@ check_zlib()
         echo "yes"
 
         echo 'CFLAGS += -DHAVE_ZLIB' `${PKG_CONFIG} zlib --cflags` >> $CONFIG
-        echo 'LDLIBS += ' `${PKG_CONFIG} zlib --libs` >>$CONFIG
+        LDLIBS="$LDLIBS $(${PKG_CONFIG} zlib --libs)"
     else
         echo "missing - this is required"
         return 1
@@ -131,6 +131,8 @@ check_libbpf()
 
     echo -n "zlib support: "
     check_zlib || exit 1
+
+    echo "LDLIBS += $LDLIBS" >>$CONFIG
 
     # For the build submodule library we know it does support this API, so we
     # hard code it. Also due to the fact it's hard to build a test app as
