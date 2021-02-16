@@ -2,6 +2,11 @@
 # SPDX-License-Identifier: GPL-2.0
 # This is not an autoconf generated configure
 #
+# Influential environment variables:
+#   LIBBPF_DIR  Location of libbpf install to use
+#   KVER        Specify a specific kernel version to build programs
+#   KSRC        Location of kernel headers (e.g., source tree)
+#   KBLD        Location of kernel build files (e.g., O= directory)
 
 # Output file which is input to Makefile
 CONFIG_FINAL=config.mk
