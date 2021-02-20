@@ -1,7 +1,7 @@
 #ifndef _FLOW_H_
 #define _FLOW_H_
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
+/* Copyright (c) 2019-2021 David Ahern <dsahern@gmail.com>
  *
  * Packet parser
  */
@@ -29,6 +29,9 @@ struct flow_icmp {
 	__be16 id;
 };
 
+#define TCP_FLAG_SYN   1 << 0
+#define TCP_FLAG_ACK   1 << 1
+
 /* used for dissecting packets */
 struct flow {
 	union {
@@ -49,7 +52,7 @@ struct flow {
 	__u8 protocol;  /* L4 protocol */
 	__u8 fragment;
 	__u8 inner_protocol;
-
+	__u8 tcp_flags;
 	__u32 inner_saddr;
 	__u32 inner_daddr;
 
@@ -131,6 +134,11 @@ static __always_inline int parse_tcp(struct flow *fl, void *nh,
 
 	fl->ports.sport = thdr->source;
 	fl->ports.dport = thdr->dest;
+
+	if (thdr->syn)
+		fl->tcp_flags |= TCP_FLAG_SYN;
+	if (thdr->ack)
+		fl->tcp_flags |= TCP_FLAG_ACK;
 
 	return 0;
 }
