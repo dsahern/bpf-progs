@@ -62,11 +62,11 @@ static __always_inline bool acl_simple(struct ethhdr *eth, struct flow *fl,
 				return false;
 			break;
 		case AF_INET6:
-			if (ipv6_any(&val->addr.ipv6))
+			if (ipv6_is_any(&val->addr.ipv6))
 				return true;
 
 			v6addr = use_src ? &fl->saddr.ipv6 : &fl->daddr.ipv6;
-			if (!my_ipv6_addr_cmp(v6addr, &val->addr.ipv6))
+			if (!do_ipv6_addr_cmp(v6addr, &val->addr.ipv6))
 				return false;
 			break;
 		default:
