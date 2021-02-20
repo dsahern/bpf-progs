@@ -239,11 +239,40 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end,
  * rc < 0:  error parsing headers
  * rc == 0: all good
  */
-static __always_inline int parse_pkt(struct flow *fl, __be16 eth_proto,
-				     void *nh, void *data_end,
-				     unsigned int flags)
+static __always_inline int parse_pkt(struct flow *fl, void *data,
+				     void *data_end, unsigned int flags)
 {
+	struct ethhdr *eth = data;
+	void *nh = eth + 1;
+	u16 eth_proto;
 	int rc;
+
+	if (nh > data_end)
+		return true;
+
+	eth_proto = eth->h_proto;
+#ifdef SUPPORT_QINQ
+	if (eth_proto == htons(ETH_P_8021AD)) {
+		struct vlan_hdr *vhdr;
+
+		vhdr = nh;
+		if (vhdr + 1 > data_end)
+			return -1;
+
+		nh += sizeof(*vhdr);
+		eth_proto = vhdr->h_vlan_encapsulated_proto;
+	}
+#endif
+	if (eth_proto == htons(ETH_P_8021Q)) {
+		struct vlan_hdr *vhdr;
+
+		vhdr = nh;
+		if (vhdr + 1 > data_end)
+			return -1;
+
+		nh += sizeof(*vhdr);
+		eth_proto = vhdr->h_vlan_encapsulated_proto;
+	}
 
 	fl->eth_proto = eth_proto;
 	if (eth_proto == htons(ETH_P_IP))
