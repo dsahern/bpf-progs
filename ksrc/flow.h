@@ -48,6 +48,7 @@ struct flow {
 #endif
 	} daddr;
 
+	__be16 eth_proto;
 	__u8 family;    /* network address family */
 	__u8 protocol;  /* L4 protocol */
 	__u8 fragment;
@@ -244,6 +245,7 @@ static __always_inline int parse_pkt(struct flow *fl, __be16 eth_proto,
 {
 	int rc;
 
+	fl->eth_proto = eth_proto;
 	if (eth_proto == htons(ETH_P_IP))
 		rc = parse_v4(fl, nh, data_end, flags);
 #ifdef ENABLE_FLOW_IPV6
