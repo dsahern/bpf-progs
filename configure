@@ -142,6 +142,8 @@ find_kernel_path()
 		echo "KSRC=/lib/modules/${KVER}/source" >> "$CONFIG"
 	elif [ -e /usr/src/linux-headers-${KVER} ]; then
 		echo "KSRC=/usr/src/linux-headers-${KVER}" >> "$CONFIG"
+	elif [ -e /usr/lib/modules/${KVER}/build/ ]; then
+		echo "KSRC=/usr/lib/modules/${KVER}/build/" >> "$CONFIG"
 	else
 		echo "Failed to find kernel source directory" >&2
 		return 1

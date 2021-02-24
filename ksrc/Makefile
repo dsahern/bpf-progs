@@ -59,8 +59,11 @@ SINCLUDES += -include include/asm_goto_workaround.h
 
 # this is to find stdarg.h. Ubuntu has this under x86_64-linux-gnu
 # and Fedora is under x86_64-redhat-linux. Let's try 'find'.
+# on Arch this directory is actually the full version number, and
+# there are multiple include files under this directory
 GCCVER=$(shell gcc -v 2>&1 | awk '{if ($$0 ~ /gcc version/) {ver=split($$3,n,"."); print n[1]}}')
-GCC_INC=$(shell find /usr/lib/gcc/x86_64-*linux*/$(GCCVER) -name include)
+GCC_INC=$(shell find /usr/lib/gcc/x86_64-*linux*/$(GCCVER)* -name include -print -quit)
+
 NOSTDINC_FLAGS = -nostdinc -isystem $(GCC_INC)
 
 all: build $(MODS)
