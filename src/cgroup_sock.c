@@ -2,6 +2,7 @@
 #include <linux/bpf.h>
 #include <linux/if_link.h>
 #include <linux/limits.h>
+#include <linux/kernel.h>
 #include <net/if.h>
 #include <errno.h>
 #include <signal.h>
