@@ -47,8 +47,10 @@ static void remove_task(struct task *task)
 
 	rb_erase(&task->rb_node, &all_tasks);
 
-	for (i = 0; i < task->narg; ++i)
+	for (i = 0; i < task->narg; ++i) {
 		free(task->arg[i]);
+		task->arg[i] = NULL;
+	}
 
 	free(task);
 }
@@ -160,8 +162,10 @@ static int print_bpf_output(void *_data, int size)
 
 	switch (data->event_type) {
 	case EVENT_START:
-		for (i = 0; i < task->narg; ++i)
+		for (i = 0; i < task->narg; ++i) {
 			free(task->arg[i]);
+			task->arg[i] = NULL;
+		}
 
 		if (data->arg)
 			task->arg[0] = strdup(data->arg);
