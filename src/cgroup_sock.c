@@ -21,6 +21,10 @@
 #include "bpf_util.h"
 #include "str_utils.h"
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(a) (sizeof(a)/sizeof((a)[0]))
+#endif
+
 static char bpf_log_buf[256*1024];
 
 static int load_dev_prog(int idx)
