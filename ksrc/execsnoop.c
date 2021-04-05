@@ -37,7 +37,7 @@ int bpf_sys_execve(struct pt_regs *ctx)
 
 	if (bpf_probe_read(&filename, sizeof(filename), pfilename) ||
 	    bpf_probe_read_str(data.arg, sizeof(data.arg), filename) < 0) {
-		strcpy(data.arg, "<filename FAILED>");
+		__builtin_strcpy(data.arg, "<filename FAILED>");
 		bail = true;
 	}
 
@@ -97,7 +97,7 @@ int bpf_sched_exit(struct sched_exit_args *ctx)
 		.event_type = EVENT_EXIT,
 	};
 
-	memcpy(data.comm, ctx->comm, 15);
+	__builtin_memcpy(data.comm, ctx->comm, 15);
 	data.pid = ctx->pid;
 
 	if (bpf_perf_event_output(ctx, &channel, BPF_F_CURRENT_CPU,
