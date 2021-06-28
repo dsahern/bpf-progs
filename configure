@@ -233,6 +233,37 @@ endif
 EOF
 }
 
+################################################################################
+# show help
+
+usage()
+{
+	cat <<EOF
+Usage: $0 OPTS
+
+OPTS:
+    -l LIBBPF  Path to libbpf install (if not using system version)
+
+    -k KVER    Kernel version to build against (default: $(uname -r))
+    -s KSRC    Location of kernel source
+    -b KBLD    Location of kernel build directory
+EOF
+}
+
+################################################################################
+# main
+
+while getopts :l:k:s:b: o
+do
+	case "$o" in
+	l) LIBBPF_DIR="$OPTARG";;
+	k) KVER="$OPTARG";;
+	s) KSRC="$OPTARG";;
+	b) KBLD="$OPTARG";;
+	*) usage; exit 1;;
+	esac
+done
+
 echo "# Generated config" >$CONFIG
 quiet_config >> $CONFIG
 
