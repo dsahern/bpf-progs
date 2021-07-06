@@ -23,6 +23,7 @@ int bpf_sys_open(struct pt_regs *ctx)
 {
 	struct data data = {
 		.time = bpf_ktime_get_ns(),
+		.cpu = (u8) bpf_get_smp_processor_id(),
 		.event_type = EVENT_ARG,
 	};
 	char *filename = (char *)PT_REGS_PARM2(ctx);
@@ -46,6 +47,7 @@ int bpf_sys_open_ret(struct pt_regs *ctx)
 {
 	struct data data = {
 		.time = bpf_ktime_get_ns(),
+		.cpu = (u8) bpf_get_smp_processor_id(),
 		.event_type = EVENT_RET,
 		.retval = ctx->ax
 	};

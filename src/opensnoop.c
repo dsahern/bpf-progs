@@ -77,6 +77,7 @@ static struct task *get_task(struct data *data, bool create)
 
 static void print_header(void)
 {
+	printf("\n\n");
 	if (print_time)
 		printf("%15s", "TIME");
 	if (print_dt)
@@ -84,8 +85,9 @@ static void print_header(void)
 	if (print_time || print_dt)
 		printf("  ");
 
-	printf("%-16s %6s/%-6s %6s %8s %8s %6s   %s\n",
-	       "COMM", "TID", "PID", "PPID", "FLAGS", "MODE", "RET", "FILENAME");
+	printf("%5s %-16s %6s/%-6s %6s %8s %8s %6s   %s\n",
+	       " CPU ", "COMM", "TID", "PID", "PPID", "FLAGS", "MODE", "RET",
+	       "FILENAME");
 	fflush(stdout);
 }
 
@@ -102,10 +104,16 @@ static void show_timestamps(__u64 start, __u64 end)
 	printf("  ");
 }
 
+bool show_header;
 
 static void process_event(struct data *data)
 {
 	struct task *task;
+
+	if (show_header) {
+		show_header = false;
+		print_header();
+	}
 
 	task = get_task(data, data->event_type == EVENT_ARG);
 	if (!task) {
@@ -120,9 +128,9 @@ static void process_event(struct data *data)
 	case EVENT_RET:
 		if (print_time || print_dt)
 			show_timestamps(task->time, data->time);
-		printf("%-16s %6d/%-6d %6d %8x %8x %6d   %s\n",
-		       task->comm, task->tid, task->pid, task->ppid,
-		       task->flags, task->mode, data->retval,
+		printf("[%03d] %-16s %6d/%-6d %6d %8x %8x %6d   %s\n",
+		       data->cpu, task->comm, task->tid, task->pid,
+		       task->ppid, task->flags, task->mode, data->retval,
 		       task->filename);
 		free_task(task);
 		break;
@@ -131,7 +139,9 @@ static void process_event(struct data *data)
 
 static int opensnoop_complete(void)
 {
+	show_header = true;
 	process_events();
+
 	return done;
 }
 
@@ -184,8 +194,6 @@ int main(int argc, char **argv)
 
 	if (configure_perf_event_channel(obj, nevents))
 		goto out;
-
-	print_header();
 
 	/* main event loop */
 	rc = perf_event_loop(NULL, NULL, opensnoop_complete);
