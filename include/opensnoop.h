@@ -14,6 +14,7 @@ enum event_type {
 
 struct data {
 	__u64 time;
+	__u32 tid;
 	__u32 pid;
 	__u32 ppid;
 	__u32 flags;

@@ -32,6 +32,7 @@ struct task {
 	struct rb_node rb_node;
 
 	__u64 time;
+	__u32 tid;
 	__u32 pid;
 	__u32 ppid;
 	char comm[TASK_COMM_LEN];
@@ -65,9 +66,9 @@ static int insert_task(struct rb_root *root, struct task *new_task)
 
 		parent = *node;
 		task = container_of(parent, struct task, rb_node);
-		if (task->pid > new_task->pid)
+		if (task->tid > new_task->tid)
 			node = &(*node)->rb_left;
-		else if (task->pid < new_task->pid)
+		else if (task->tid < new_task->tid)
 			node = &(*node)->rb_right;
 		else
 			return -EEXIST;
@@ -83,16 +84,16 @@ static struct task *get_task(struct data *data, bool create)
 {
 	struct rb_node **p = &all_tasks.rb_node;
 	struct rb_node *parent = NULL;
-	__u32 pid = data->pid;
+	__u32 tid = data->tid;
 	struct task *task;
 
 	while (*p != NULL) {
 		parent = *p;
 
 		task = container_of(parent, struct task, rb_node);
-		if (task->pid > pid)
+		if (task->tid > tid)
 			p = &(*p)->rb_left;
-		else if (task->pid < pid)
+		else if (task->tid < tid)
 			p = &(*p)->rb_right;
 		else
 			return task;
@@ -104,6 +105,7 @@ static struct task *get_task(struct data *data, bool create)
 	task = calloc(1, sizeof(*task));
 	if (task) {
 		task->time = data->time;
+		task->tid = data->tid;
 		task->pid = data->pid;
 		task->ppid = data->ppid;
 		strcpy(task->comm, data->comm);
@@ -155,7 +157,7 @@ static int print_bpf_output(void *_data, int size)
 			fprintf(stderr,
 				"Failed to get task entry for event %s: %s %d %d\n",
 				event_names[data->event_type],
-				data->comm, data->pid, data->ppid);
+				data->comm, data->tid, data->pid);
 		}
 		goto out;
 	}
@@ -185,8 +187,9 @@ static int print_bpf_output(void *_data, int size)
 		if (!success_only || data->retval == 0) {
 			if (print_time || print_dt)
 				show_timestamps(task->time, data->time);
-			printf("[%02u] %6d %6d %6d   %s ->",
-			       data->cpu, task->ppid, task->pid, data->retval, task->comm);
+			printf("[%02u] %6d %6d/%-6d %6d   %s ->",
+			       data->cpu, task->ppid, task->tid, task->pid,
+			       data->retval, task->comm);
 
 			for (i = 0; i < task->narg; ++i)
 				printf(" %s", task->arg[i]);
@@ -198,8 +201,9 @@ static int print_bpf_output(void *_data, int size)
 	case EVENT_EXIT:
 		if (print_time || print_dt)
 			show_timestamps(task->time, data->time);
-		printf("[%02u] %6d %6d %6s   %s [EXIT]\n",
-		       data->cpu, task->ppid, task->pid, "", data->comm);
+		printf("[%02u] %6d %6d/%-6d %6s   %s [EXIT]\n",
+		       data->cpu, task->ppid, task->tid, task->pid,
+		       "", data->comm);
 		remove_task(task);
 	}
 

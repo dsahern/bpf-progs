@@ -31,6 +31,7 @@ static bool done;
 struct task {
 	struct list_head list;
 	__u64 time;
+	__u32 tid;
 	__u32 pid;
 	__u32 ppid;
 	__u32 flags;
@@ -53,7 +54,8 @@ static struct task *get_task(struct data *data, bool create)
 	struct task *task;
 
 	list_for_each_entry(task, &entries, list) {
-		if (data->pid == task->pid &&
+		if (data->tid == task->tid &&
+		    data->pid == task->pid &&
 		    data->ppid == task->ppid)
 			return task;
 	}
@@ -64,6 +66,7 @@ static struct task *get_task(struct data *data, bool create)
 	task = calloc(1, sizeof(*task));
 	if (task) {
 		task->time = data->time;
+		task->tid = data->tid;
 		task->pid = data->pid;
 		task->ppid = data->ppid;
 		strcpy(task->comm, data->comm);
@@ -81,8 +84,8 @@ static void print_header(void)
 	if (print_time || print_dt)
 		printf("  ");
 
-	printf("%-16s %6s %6s %8s %8s %6s   %s\n",
-	       "COMM", "PID", "PPID", "FLAGS", "MODE", "RET", "FILENAME");
+	printf("%-16s %6s/%-6s %6s %8s %8s %6s   %s\n",
+	       "COMM", "TID", "PID", "PPID", "FLAGS", "MODE", "RET", "FILENAME");
 	fflush(stdout);
 }
 
@@ -117,9 +120,10 @@ static int print_bpf_output(void *_data, int size)
 	case EVENT_RET:
 		if (print_time || print_dt)
 			show_timestamps(task->time, data->time);
-		printf("%-16s %6d %6d %8x %8x %6d   %s\n",
-		       task->comm, task->pid, task->ppid, task->flags,
-		       task->mode, data->retval, task->filename);
+		printf("%-16s %6d/%-6d %6d %8x %8x %6d   %s\n",
+		       task->comm, task->tid, task->pid, task->ppid,
+		       task->flags, task->mode, data->retval,
+		       task->filename);
 		free_task(task);
 		break;
 	}
