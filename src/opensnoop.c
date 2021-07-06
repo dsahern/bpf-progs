@@ -102,15 +102,15 @@ static void show_timestamps(__u64 start, __u64 end)
 	printf("  ");
 }
 
-static int print_bpf_output(void *_data, int size)
+
+static void process_event(struct data *data)
 {
-	struct data *data = _data;
 	struct task *task;
 
 	task = get_task(data, data->event_type == EVENT_ARG);
 	if (!task) {
 		printf("Failed to get task entry\n");
-		goto out;
+		return;
 	}
 
 	switch (data->event_type) {
@@ -127,19 +127,11 @@ static int print_bpf_output(void *_data, int size)
 		free_task(task);
 		break;
 	}
-
-out:
-	fflush(stdout);
-	return LIBBPF_PERF_EVENT_CONT;
-}
-
-static void process_event(struct data *data)
-{
-	/* nothing to do */
 }
 
 static int opensnoop_complete(void)
 {
+	process_events();
 	return done;
 }
 
@@ -196,7 +188,7 @@ int main(int argc, char **argv)
 	print_header();
 
 	/* main event loop */
-	rc = perf_event_loop(print_bpf_output, NULL, opensnoop_complete);
+	rc = perf_event_loop(NULL, NULL, opensnoop_complete);
 out:
 	close_perf_event_channel();
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));
