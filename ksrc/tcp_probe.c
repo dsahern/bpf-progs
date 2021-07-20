@@ -18,8 +18,11 @@ int bpf_tcp_probe(struct tcp_probe_args *ctx)
 		.cpu = bpf_get_smp_processor_id(),
 	};
 
-	memcpy(&data.s_addr, &ctx->s_addr, sizeof(struct sockaddr_in6));
-	memcpy(&data.d_addr, &ctx->d_addr, sizeof(struct sockaddr_in6));
+	if (ctx->sport == 22 || ctx->dport == 22)
+		return 0;
+
+	__builtin_memcpy(&data.s_addr, &ctx->s_addr, sizeof(struct sockaddr_in6));
+	__builtin_memcpy(&data.d_addr, &ctx->d_addr, sizeof(struct sockaddr_in6));
 	data.mark = ctx->mark;
 	data.data_len = ctx->data_len;
 	data.snd_nxt = ctx->snd_nxt;
