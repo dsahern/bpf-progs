@@ -3,7 +3,7 @@
 This repository is self contained now. It compiles cleanly on Ubuntu
 18.04 for kernel versions 4.14, 4.15, 5.3 and 5.5+.
 ```
-apt-get install clang llvm gcc make libelf-dev
+apt-get install clang llvm gcc make libelf-dev libpcap-dev
 
 install linux-headers for kernel version.
 ```
