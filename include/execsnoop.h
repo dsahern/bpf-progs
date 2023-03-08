@@ -27,4 +27,38 @@ struct data {
 	char arg[ARGSIZE];
 };
 
+/* order of arguments from
+ * /sys/kernel/tracing/events/syscalls/sys_enter_execve/format
+ * but skipping all of the common fields:
+
+        field:int __syscall_nr; offset:8;       size:4; signed:1;
+        field:const char * filename;    offset:16;      size:8; signed:0;
+        field:const char *const * argv; offset:24;      size:8; signed:0;
+        field:const char *const * envp; offset:32;      size:8; signed:0;
+ */
+
+struct execve_enter_args {
+	unsigned long long unused;
+
+	int __syscall_nr;
+	const char * filename;
+	const char *const * argv;
+	const char *const * envp;
+};
+
+/* order of arguments from
+ *   /sys/kernel/tracing/events/syscalls/sys_exit_execve/format
+ * but skipping all of the common fields:
+
+        field:int __syscall_nr; offset:8;       size:4; signed:1;
+        field:long ret; offset:16;      size:8; signed:1;
+ */
+
+struct execve_exit_args {
+	unsigned long long unused;
+
+	int __syscall_nr;
+	long ret;
+};
+
 #endif
