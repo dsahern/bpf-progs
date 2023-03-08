@@ -230,6 +230,7 @@ static void print_usage(char *prog)
 	printf(
 	"usage: %s OPTS\n\n"
 	"	-f bpf-file    bpf filename to load\n"
+	"	-s             use syscall tracepoints instead of kprobes\n"
 	"	-v             enable verbose logging\n"
 	"	-T             do not show timestamps (default on)\n"
 	"	-D             show syscall time (default off)\n"
@@ -246,12 +247,18 @@ int main(int argc, char **argv)
 		{ .prog = "kprobe/execve_ret", .func = "__x64_sys_execve",
 		  .fd = -1, .retprobe = true },
 	};
+	const char *tps_exec[] = {
+		"syscalls/sys_enter_execve",
+		"syscalls/sys_exit_execve",
+		NULL
+	};
 	const char *tps[] = {
 		"sched/sched_process_exit",
 		NULL
 	};
 	char *objfile = "execsnoop.o";
 	bool filename_set = false;
+	bool use_kprobe = true;
 	struct bpf_object *obj;
 	int nevents = 100;
 	int attr_type;
@@ -265,12 +272,15 @@ int main(int argc, char **argv)
 		objfile = "execsnoop_legacy.o";
 	}
 
-	while ((rc = getopt(argc, argv, "f:vTDA")) != -1)
+	while ((rc = getopt(argc, argv, "f:svTDA")) != -1)
 	{
 		switch(rc) {
 		case 'f':
 			objfile = optarg;
 			filename_set = true;
+			break;
+		case 's':
+			use_kprobe = false;
 			break;
 		case 'v':
 			verbose++;
@@ -307,8 +317,14 @@ int main(int argc, char **argv)
 		return 1;
 
 	rc = 1;
-	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)) ||
-	    do_tracepoint(obj, tps))
+	if (use_kprobe) {
+		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
+			goto out;
+	} else if (do_tracepoint(obj, tps_exec)) {
+		goto out;
+	}
+
+	if (do_tracepoint(obj, tps))
 		goto out;
 
 	if (configure_perf_event_channel(obj, nevents))
