@@ -73,7 +73,7 @@ static void insert_event(struct event *e_new)
 			node = &(*node)->rb_right;
 		else {
 			/* handle multiple events with the same timestamp */
-			list_add(&e_new->list, &e->list);
+			list_add_tail(&e_new->list, &e->list);
 			return;
 		}
 	}
@@ -86,6 +86,8 @@ static void __process_event(struct event *event)
 {
 	struct event *e, *tmp;
 
+	process_event(&event->data);
+
 	if (!list_empty(&event->list)) {
 		list_for_each_entry_safe(e, tmp, &event->list, list) {
 			list_del(&e->list);
@@ -94,8 +96,6 @@ static void __process_event(struct event *event)
 			remove_event(e);
 		}
 	}
-
-	process_event(&event->data);
 }
 
 /* last event seen on this cpu */
