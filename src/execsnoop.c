@@ -27,6 +27,7 @@ static bool print_time = true;
 static bool print_dt;
 static bool success_only = true;
 static bool done;
+static unsigned int verbose;
 
 struct task {
 	struct rb_node rb_node;
@@ -143,16 +144,21 @@ static void show_timestamps(__u64 start, __u64 end)
 	printf("  ");
 }
 
-static const char *event_names[] = { "start", "arg", "ret", "exit" };
+static const char *event_names[EVENT_MAX] = { "start", "arg", "ret", "exit" };
 
 static void process_event(struct data *data)
 {
 	struct task *task;
 	int i;
 
+	if (verbose)
+		printf("%llu [%02d] event %s proc %s %d/%d comm %s arg %s data %px\n",
+			data->time, data->cpu, event_names[data->event_type],
+			data->comm, data->tid, data->pid,
+			data->comm, data->arg, data);
 	task = get_task(data, data->event_type == EVENT_START);
 	if (!task) {
-		if (data->event_type != EVENT_EXIT) {
+		if (data->event_type != EVENT_EXIT && verbose) {
 			fprintf(stderr,
 				"Failed to get task entry for event %s: %s %d %d\n",
 				event_names[data->event_type],
@@ -224,6 +230,7 @@ static void print_usage(char *prog)
 	printf(
 	"usage: %s OPTS\n\n"
 	"	-f bpf-file    bpf filename to load\n"
+	"	-v             enable verbose logging\n"
 	"	-T             do not show timestamps (default on)\n"
 	"	-D             show syscall time (default off)\n"
 	"	-A             show all execs (default only successful exec)\n"
@@ -258,12 +265,15 @@ int main(int argc, char **argv)
 		objfile = "execsnoop_legacy.o";
 	}
 
-	while ((rc = getopt(argc, argv, "f:TDA")) != -1)
+	while ((rc = getopt(argc, argv, "f:vTDA")) != -1)
 	{
 		switch(rc) {
 		case 'f':
 			objfile = optarg;
 			filename_set = true;
+			break;
+		case 'v':
+			verbose++;
 			break;
 		case 'T':
 			print_time = false;

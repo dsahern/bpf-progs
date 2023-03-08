@@ -12,6 +12,7 @@ enum event_type {
 	EVENT_ARG,
 	EVENT_RET,
 	EVENT_EXIT,
+	EVENT_MAX,
 };
 
 struct data {
