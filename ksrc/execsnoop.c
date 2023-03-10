@@ -36,7 +36,7 @@ int bpf_sys_execve(struct pt_regs *ctx)
 	set_current_info(&data);
 
 	if (bpf_probe_read(&filename, sizeof(filename), pfilename) ||
-	    bpf_probe_read_str(data.arg, sizeof(data.arg), filename) < 0) {
+	    bpf_probe_read_str(data.arg, sizeof(data.arg)-1, filename) < 0) {
 		__builtin_strcpy(data.arg, "<filename FAILED>");
 		bail = true;
 	}
@@ -56,8 +56,9 @@ int bpf_sys_execve(struct pt_regs *ctx)
 
 		if (bpf_probe_read(&ptr, sizeof(ptr), &argv[i]) || ptr == NULL)
 			goto out;
-		if (bpf_probe_read_str(data.arg, sizeof(data.arg), ptr) < 0)
+		if (bpf_probe_read_str(data.arg, sizeof(data.arg)-1, ptr) < 0)
 			goto out;
+
 		if (bpf_perf_event_output(ctx, &channel, BPF_F_CURRENT_CPU,
 					  &data, sizeof(data)) < 0)
 			goto out;

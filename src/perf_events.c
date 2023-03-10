@@ -88,13 +88,14 @@ static void __process_event(struct event *event)
 
 	process_event(&event->data);
 
-	if (!list_empty(&event->list)) {
-		list_for_each_entry_safe(e, tmp, &event->list, list) {
-			list_del(&e->list);
+	if (event->list.prev == event->list.next)
+		return;
 
-			process_event(&e->data);
-			remove_event(e);
-		}
+	list_for_each_entry_safe(e, tmp, &event->list, list) {
+		list_del(&e->list);
+
+		process_event(&e->data);
+		remove_event(e);
 	}
 }
 
@@ -159,14 +160,14 @@ static int __handle_bpf_output(void *_data, int size)
 		return LIBBPF_PERF_EVENT_ERROR;
 	}
 
-	event = calloc(1, sizeof(*event));
+	event = malloc(sizeof(*event));
 	if (!event) {
 		fprintf(stderr, "Failed to allocate memory for event\n");
 		return LIBBPF_PERF_EVENT_ERROR;
 	}
 	INIT_LIST_HEAD(&event->list);
 
-	memcpy(&event->data, data, sizeof(*data));
+	memcpy(&event->data, data, sizeof(event->data));
 	insert_event(event);
 
 	return LIBBPF_PERF_EVENT_CONT;
