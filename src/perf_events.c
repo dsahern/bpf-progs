@@ -29,6 +29,8 @@ static const char *tracingfs = "/sys/kernel/debug/tracing";
 static int numcpus;
 static int page_size;
 static int page_cnt = 256;  /* pages per mmap */
+static __u64 total_events;
+static __u64 time_drops;
 
 /* users of the generic caching API are expected to implement
  * process_event.
@@ -72,8 +74,8 @@ static void insert_event(struct event *e_new)
 		else if (e->data.time < e_new->data.time)
 			node = &(*node)->rb_right;
 		else {
-			/* handle multiple events with the same timestamp */
-			list_add_tail(&e_new->list, &e->list);
+			free(e_new);
+			time_drops++;
 			return;
 		}
 	}
@@ -169,6 +171,7 @@ static int __handle_bpf_output(void *_data, int size)
 
 	memcpy(&event->data, data, sizeof(event->data));
 	insert_event(event);
+	total_events++;
 
 	return LIBBPF_PERF_EVENT_CONT;
 }
@@ -394,6 +397,9 @@ int configure_perf_event_channel(struct bpf_object *obj, int nevents)
 void close_perf_event_channel(void)
 {
 	int i;
+
+	printf("total events: %llu\n", total_events);
+	printf("drops due to time collision: %llu\n", time_drops);
 
 	for (i = 0; i < numcpus; i++) {
 		ioctl(pmu_fds[i], PERF_EVENT_IOC_DISABLE, 0);
