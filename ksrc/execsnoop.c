@@ -59,6 +59,8 @@ int bpf_sys_execve(struct pt_regs *ctx)
 		if (bpf_probe_read_str(data.arg, sizeof(data.arg)-1, ptr) < 0)
 			goto out;
 
+		/* give each event a different timestamp */
+		data.time++;
 		if (bpf_perf_event_output(ctx, &channel, BPF_F_CURRENT_CPU,
 					  &data, sizeof(data)) < 0)
 			goto out;
