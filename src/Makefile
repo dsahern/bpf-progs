@@ -43,7 +43,7 @@ INCLUDES  = -I../include -I../include/uapi
 INCLUDES += -I../include/tools
 
 ifneq (,$(LIBBPF_DIR))
-BPF_LINK_FEAT := $(shell egrep 'bpf_link_create' $(LIBBPF_PATH)/usr/include/bpf/libbpf.h)
+BPF_LINK_FEAT := $(shell egrep 'bpf_link_create' $(LIBBPF_DIR)/usr/include/bpf/libbpf.h)
 ifneq (,$(BPF_LINK_FEAT))
 CFLAGS += -DHAVE_BPF_LINK_CREATE
 endif
