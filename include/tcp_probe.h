@@ -47,6 +47,23 @@ struct data {
         field:__u32 srtt;       offset:96;      size:4; signed:0;
         field:__u32 rcv_wnd;    offset:100;     size:4; signed:0;
         field:__u64 sock_cookie;        offset:104;     size:8; signed:0;
+
+5.13:
+        field:__u8 saddr[sizeof(struct sockaddr_in6)];  offset:8;       size:28;        signed:0;
+        field:__u8 daddr[sizeof(struct sockaddr_in6)];  offset:36;      size:28;        signed:0;
+        field:__u16 sport;      offset:64;      size:2; signed:0;
+        field:__u16 dport;      offset:66;      size:2; signed:0;
+        field:__u16 family;     offset:68;      size:2; signed:0;
+        field:__u32 mark;       offset:72;      size:4; signed:0;
+        field:__u16 data_len;   offset:76;      size:2; signed:0;
+        field:__u32 snd_nxt;    offset:80;      size:4; signed:0;
+        field:__u32 snd_una;    offset:84;      size:4; signed:0;
+        field:__u32 snd_cwnd;   offset:88;      size:4; signed:0;
+        field:__u32 ssthresh;   offset:92;      size:4; signed:0;
+        field:__u32 snd_wnd;    offset:96;      size:4; signed:0;
+        field:__u32 srtt;       offset:100;     size:4; signed:0;
+        field:__u32 rcv_wnd;    offset:104;     size:4; signed:0;
+        field:__u64 sock_cookie;        offset:112;     size:8; signed:0;
  */
 struct tcp_probe_args {
 	unsigned long long unused;
@@ -64,8 +81,11 @@ struct tcp_probe_args {
 
 	__u16 sport;
 	__u16 dport;
+	__u16 family;
+	__u16 hole1;
 	__u32 mark;
 	__u16 data_len;
+	__u16 hole2;
 	__u32 snd_nxt;
 	__u32 snd_una;
 	__u32 snd_cwnd;
@@ -73,7 +93,8 @@ struct tcp_probe_args {
 	__u32 snd_wnd;
 	__u32 srtt;
 	__u32 rcv_wnd;
+	__u32 hole3;
 	__u64 sock_cookie;
-};
+} __attribute__ ((packed));
 
 #endif
