@@ -108,6 +108,23 @@ static bool addr_uses_port(struct sockaddr *sa, __u16 port)
 	return false;
 }
 
+static void normalize_data(unsigned int *pval, char *units)
+{
+	unsigned int val = *pval;
+
+	if (val > 1024 * 1024) {
+		*units = 'M';
+		val = val / 1024 / 1024;
+	} else if (val > 1024) {
+		*units = 'K';
+		val = val / 1024;
+	} else {
+		*units = 'B';
+	}
+
+	*pval = val;
+}
+
 static void process_event(struct data *data)
 {
 	unsigned int sndw, rcvw, snd_next = 0, snd_una = 0;
@@ -145,27 +162,11 @@ static void process_event(struct data *data)
 	log_address(&data->s_addr);
 	log_address(&data->d_addr);
 
-	if (data->snd_wnd > 1024 * 1024) {
-		snd_u = 'M';
-		sndw = data->snd_wnd/1024/1024;
-	} else if (data->snd_wnd > 1024) {
-		snd_u = 'K';
-		sndw = data->snd_wnd/1024;
-	} else {
-		snd_u = 'B';
-		sndw = data->snd_wnd/1024;
-	}
+	sndw = data->snd_wnd;
+	normalize_data(&sndw, &snd_u);
 
-	if (data->rcv_wnd > 1024 * 1024) {
-		rcv_u = 'M';
-		rcvw = data->rcv_wnd/1024/1024;
-	} else if (data->rcv_wnd > 1024) {
-		rcv_u = 'K';
-		rcvw = data->rcv_wnd/1024;
-	} else {
-		rcv_u = 'B';
-		rcvw = data->rcv_wnd/1024;
-	}
+	rcvw = data->rcv_wnd;
+	normalize_data(&rcvw, &rcv_u);
 
 	if (snd_next > data->snd_nxt)
 		snd_seq = 0xFFFFFFFF - snd_next + data->snd_nxt;
