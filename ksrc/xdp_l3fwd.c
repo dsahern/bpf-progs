@@ -4,7 +4,7 @@
  * Copyright (c) 2017-18 David Ahern <dsahern@gmail.com>
  */
 #define KBUILD_MODNAME "xdp_l3fwd"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>

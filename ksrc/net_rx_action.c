@@ -5,8 +5,8 @@
  */
 
 #define KBUILD_MODNAME "net_rx_action"
-#include <uapi/linux/bpf.h>
-#include <uapi/linux/ptrace.h>
+#include <linux/bpf.h>
+#include <linux/ptrace.h>
 #include <linux/version.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>

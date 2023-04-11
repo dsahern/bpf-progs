@@ -4,7 +4,7 @@
  * Rx ACL
  */
 #define KBUILD_MODNAME "rx_acl"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/in.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>

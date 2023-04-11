@@ -4,7 +4,7 @@
  * Rx ACL for a VM - packets from VM
  */
 #define KBUILD_MODNAME "acl_vm_rx"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 
 #include "acl_simple.h"
 

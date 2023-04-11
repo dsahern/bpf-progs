@@ -5,7 +5,7 @@
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
 #define KBUILD_MODNAME "xdp_l2fwd"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/if_vlan.h>

@@ -4,7 +4,7 @@
  * Tx ACL for a VM - packets going to a VM
  */
 #define KBUILD_MODNAME "acl_vm_tx"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 
 #include "acl_simple.h"
 

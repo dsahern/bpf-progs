@@ -4,7 +4,7 @@
  * David Ahern <dsahern@gmail.com>
  */
 #define KBUILD_MODNAME "xdp_dummy"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/version.h>
 #include <bpf/bpf_helpers.h>
 

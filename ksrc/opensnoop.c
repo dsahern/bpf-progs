@@ -6,8 +6,8 @@
  * David Ahern <dsahern@gmail.com>
  */
 #define KBUILD_MODNAME "opensnoop"
-#include <uapi/linux/ptrace.h>
-#include <uapi/linux/bpf.h>
+#include <linux/ptrace.h>
+#include <linux/bpf.h>
 #include <linux/sched.h>
 #include <linux/version.h>
 #include <bpf/bpf_helpers.h>

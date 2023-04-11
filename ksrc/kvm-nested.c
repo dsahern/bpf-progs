@@ -4,7 +4,7 @@
  */
 
 #define KBUILD_MODNAME "kvm_nested"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/version.h>
 #include <bpf/bpf_helpers.h>
 

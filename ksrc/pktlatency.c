@@ -15,7 +15,7 @@
  */
 
 #define KBUILD_MODNAME "pktlatency"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>

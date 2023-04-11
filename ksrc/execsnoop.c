@@ -5,8 +5,8 @@
  */
 
 #define KBUILD_MODNAME "execsnoop"
-#include <uapi/linux/ptrace.h>  /* pt_regs via asm/ptrace.h */
-#include <uapi/linux/bpf.h>
+#include <linux/ptrace.h>  /* pt_regs via asm/ptrace.h */
+#include <linux/bpf.h>
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/version.h>

@@ -6,7 +6,7 @@
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
 #define KBUILD_MODNAME "pktdrop"
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/version.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>

@@ -5,7 +5,7 @@
  * helpers for pushing/popping vlan for xdp context
  */
 
-#include <uapi/linux/bpf.h>
+#include <linux/bpf.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/if_vlan.h>

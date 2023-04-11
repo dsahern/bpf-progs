@@ -1,7 +1,7 @@
 #define KBUILD_MODNAME "tcp_probe"
-#include <uapi/linux/bpf.h>
-#include <uapi/linux/in.h>
-#include <uapi/linux/in6.h>
+#include <linux/bpf.h>
+#include <linux/in.h>
+#include <linux/in6.h>
 #include <linux/socket.h>
 #include <linux/version.h>
 #include <bpf/bpf_helpers.h>
