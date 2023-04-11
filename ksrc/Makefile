@@ -35,6 +35,7 @@ VPATH := .
 # rule is based on samples/bpf/Makefile
 DEFS = -D__KERNEL__ -D__BPF_TRACING__  -D__TARGET_ARCH_x86 $(EXTRA_DEFS)
 
+CFLAGS += -g
 CFLAGS += -Wno-unused-value -Wno-pointer-sign
 CFLAGS += -Wno-compare-distinct-pointer-types
 CFLAGS += -Wno-gnu-variable-sized-type-not-at-end
