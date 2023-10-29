@@ -58,6 +58,7 @@ COMMON += $(OBJDIR)rbtree.o
 COMMON += $(OBJDIR)parse_pkt.o
 COMMON += $(OBJDIR)print_pkt.o
 COMMON += $(OBJDIR)ksyms.o
+COMMON += $(OBJDIR)tp_verify.o
 
 all: build $(MODS)
 
