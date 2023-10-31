@@ -2,6 +2,9 @@
 #ifndef __STR_UTILS_H
 #define __STR_UTILS_H
 
+#include <stdbool.h>
+#include <linux/types.h>
+
 int str_to_int(const char *str, int min, int max, int *value);
 int str_to_ushort(const char *str, unsigned short *us);
 int str_to_ulong(const char *str, unsigned long *ul);
