@@ -12,8 +12,6 @@
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
-#define sizeof_field(TYPE, MEMBER) sizeof((((TYPE *)0)->MEMBER))
-
 int tp_validate_context(char *sys_name, char *tp_name,
 		        struct tp_ctx *ctx, unsigned int ctx_entries)
 {
