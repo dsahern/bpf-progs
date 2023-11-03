@@ -16,12 +16,12 @@
 #include <sys/sysinfo.h>
 #include <sys/types.h>
 #include <time.h>
-#include <unistd.h>
 #include <limits.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <poll.h>
 #include <unistd.h>
+#include <bpf/bpf.h>
 
 #include "perf_events.h"
 
