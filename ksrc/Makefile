@@ -43,6 +43,7 @@ CFLAGS += -Wno-address-of-packed-member
 CFLAGS += -Wno-tautological-compare
 CFLAGS += -Wno-unknown-warning-option
 CFLAGS += -fno-stack-protector
+CFLAGS += -fcf-protection
 
 INCLUDES  = -I../include
 INCLUDES += -I../libbpf/usr/include
