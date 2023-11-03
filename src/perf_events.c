@@ -32,8 +32,6 @@
  */
 static void process_event(struct data *data);
 
-static struct perf_event_mmap_page *headers[MAX_CPUS];
-
 /*
  * time sorted list of events
  */
@@ -263,7 +261,7 @@ static int perf_event_poller_multi(struct perf_event_ctx *ctx,
 			round_start_fn();
 
 		for (i = 0; i < ctx->num_cpus; i++) {
-			ret = bpf_perf_event_read_simple(headers[i],
+			ret = bpf_perf_event_read_simple(ctx->headers[i],
 							 page_cnt * page_size,
 							 page_size, &buf, &len,
 							 bpf_perf_event_print,
@@ -333,6 +331,12 @@ int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 		return 1;
 	}
 
+	ctx->headers = calloc(ctx->num_cpus, sizeof(struct perf_event_mmap_page *));
+	if (!ctx->headers) {
+		fprintf(stderr, "Failed to allocate memory for mmap_page\n");
+		goto err_out;
+	}
+
 	map = bpf_object__find_map_by_name(obj, "channel");
 	if (!map) {
 		fprintf(stderr, "Failed to get channel map in obj file\n");
@@ -345,13 +349,18 @@ int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 		goto err_out;
 
 	for (i = 0; i < ctx->num_cpus; i++) {
-		if (perf_event_mmap_header(ctx, ctx->pmu_fds[i], &headers[i]) < 0)
+		int err;
+
+		err = perf_event_mmap_header(ctx, ctx->pmu_fds[i],
+					     &ctx->headers[i]);
+		if (err < 0)
 			goto err_out;
 	}
 
 	return 0;
 err_out:
 	free(ctx->pmu_fds);
+	free(ctx->headers);
 	return 1;
 }
 
@@ -368,6 +377,7 @@ void perf_event_close(struct perf_event_ctx *ctx)
 	}
 
 	free(ctx->pmu_fds);
+	free(ctx->headers);
 }
 
 int perf_event_tp_set_prog(int prog_fd, __u64 config)
