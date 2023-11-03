@@ -5,16 +5,12 @@
 #include <linux/perf_event.h>
 #include <bpf/libbpf.h>
 
-struct kprobe_data {
-	const char *prog;
-	const char *func;
-	int fd;
-	bool retprobe;
-};
+#define TRACINGFS "/sys/kernel/debug/tracing"
 
-int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
-		unsigned int count);
-void kprobe_cleanup(struct kprobe_data *probes, unsigned int count);
+int sys_perf_event_open(struct perf_event_attr *attr,
+			int cpu, unsigned long flags);
+
+int perf_event_tp_set_prog(int prog_fd, __u64 config);
 
 typedef enum bpf_perf_event_ret (*perf_event_print_fn)(void *data, int size);
 

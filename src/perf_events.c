@@ -25,7 +25,8 @@
 
 #include "perf_events.h"
 
-static const char *tracingfs = "/sys/kernel/debug/tracing";
+#include "kprobes.c"
+
 static int numcpus;
 static int page_size;
 static int page_cnt = 256;  /* pages per mmap */
@@ -176,8 +177,8 @@ static int __handle_bpf_output(void *_data, int size)
 	return LIBBPF_PERF_EVENT_CONT;
 }
 
-static int sys_perf_event_open(struct perf_event_attr *attr,
-			       int cpu, unsigned long flags)
+int sys_perf_event_open(struct perf_event_attr *attr,
+			int cpu, unsigned long flags)
 {
 	pid_t pid = -1;
 	int group_fd = -1;
@@ -355,7 +356,7 @@ void close_perf_event_channel(void)
 	}
 }
 
-static int tp_perf_event(int prog_fd, __u64 config)
+int perf_event_tp_set_prog(int prog_fd, __u64 config)
 {
 	struct perf_event_attr attr = {
 		.sample_type = PERF_SAMPLE_RAW,
@@ -387,18 +388,14 @@ static int tp_perf_event(int prog_fd, __u64 config)
 	return fd;
 }
 
-static int tp_event_id(const char *event, bool probe)
+static int tp_event_id(const char *event)
 {
 	char filename[PATH_MAX];
 	int fd, n, id = -1;
 	char buf[64] = {};
 
-	if (probe)
-		snprintf(filename, sizeof(filename), "%s/events/probe/%s/id",
-			 tracingfs, event);
-	else
-		snprintf(filename, sizeof(filename), "%s/events/%s/id",
-			 tracingfs, event);
+	snprintf(filename, sizeof(filename), "%s/events/%s/id",
+		 TRACINGFS, event);
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0) {
@@ -409,7 +406,7 @@ static int tp_event_id(const char *event, bool probe)
 
 	n = read(fd, buf, sizeof(buf)-1);
 	if (n < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
+		fprintf(stderr, "Failed to read '%s' to learn tracepoint type\n",
 			filename);
 	} else {
 		id = atoi(buf);
@@ -423,11 +420,11 @@ int tracepoint_perf_event(int prog_fd, const char *name)
 {
 	int id;
 
-	id = tp_event_id(name, false);
+	id = tp_event_id(name);
 	if (id < 0)
 		return 1;
 
-	return tp_perf_event(prog_fd, id);
+	return perf_event_tp_set_prog(prog_fd, id);
 }
 
 /* tps is a NULL terminated array of tracepoint names.
@@ -461,127 +458,6 @@ int do_tracepoint(struct bpf_object *obj, const char *tps[])
 	}
 
 	return 0;
-}
-
-static int kprobes_event_id(const char *event)
-{
-	char filename[PATH_MAX];
-	int fd, n, id = -1;
-	char buf[64] = {};
-
-	snprintf(filename, sizeof(filename), "%s/events/kprobes/%s/id",
-		 tracingfs, event);
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn id for tracing event '%s'\n",
-			filename, event);
-		return -1;
-	}
-
-	n = read(fd, buf, sizeof(buf)-1);
-	if (n < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
-			filename);
-	} else {
-		id = atoi(buf);
-	}
-	close(fd);
-
-	return id;
-}
-
-static int do_kprobe_event(const char *event)
-{
-	char filename[PATH_MAX];
-	int rc = 0;
-	int fd;
-
-	snprintf(filename, sizeof(filename), "%s/kprobe_events", tracingfs);
-
-	fd = open(filename, O_WRONLY|O_APPEND);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn id for event '%s'\n",
-			filename, event);
-		return -1;
-	}
-	if (write(fd, event, strlen(event)) != strlen(event)) {
-		fprintf(stderr, "Failed writing event '%s' to '%s'\n",
-			event, filename);
-		rc = -1;
-	}
-	close(fd);
-
-	return rc;
-}
-
-static int kprobe_perf_event_legacy(int prog_fd, const char *func,
-				    bool retprobe)
-{
-	char event[128], pname[64];
-	char t = 'p';
-	int id;
-
-	if (strlen(func) + 10 > sizeof(pname)) {
-		fprintf(stderr,
-			"buf size too small in kprobe_perf_event_legacy\n");
-		return -1;
-	}
-	if (retprobe)
-		t = 'r';
-
-	/*    probe: p:kprobes/p_<func>_<pid>
-	 * retprobe: r:kprobes/r_<func>_<pid>
-	 *  delete:  -:kprobes/<p>_<func>_<pid>
-	 */
-	snprintf(pname, sizeof(pname), "%c_%s_%d", t, func, getpid());
-	if (prog_fd < 0)
-		snprintf(event, sizeof(event), "-:kprobes/%s", pname);
-	else
-		snprintf(event, sizeof(event), "%c:kprobes/%s %s", t, pname, func);
-
-	if (do_kprobe_event(event))
-		return -1;
-
-	if (prog_fd < 0)
-		return 0;
-
-	id = kprobes_event_id(pname);
-	if (id < 0) {
-		fprintf(stderr, "Failed to get id for '%s'\n", pname);
-		return -1;
-	}
-
-	return tp_perf_event(prog_fd, id);
-}
-
-static int kprobe_event_type(void)
-{
-	static int kprobe_type = -1;
-	static bool checked = false;
-	char filename[] = "/sys/bus/event_source/devices/kprobe/type";
-	char buf[64] = {};
-	int fd, n;
-
-	if (checked)
-		return kprobe_type;
-
-	fd = open(filename, O_RDONLY);
-	if (fd < 0)
-		return -1;
-
-	n = read(fd, buf, sizeof(buf)-1);
-	if (n < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
-			filename);
-	} else {
-		kprobe_type = atoi(buf);
-	}
-	close(fd);
-
-	checked = true;
-
-	return kprobe_type;
 }
 
 /* modern way to do ebpf with kprobe - create the probe
@@ -620,87 +496,13 @@ int kprobe_perf_event(int prog_fd, const char *func, int retprobe,
 	return fd;
 }
 
-/* probes is a NULL terminated array of function names to put
- * kprobe. bpf program is expected to be named kprobe/%s.
- * If retprobe is set, bpf program name is expected to be
- * "kprobe/%s_ret"
- */
-int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
-		unsigned int count)
-{
-	struct bpf_program *prog;
-	int prog_fd, attr_type;
-	unsigned int i;
-	int rc = 0;
-
-	attr_type = kprobe_event_type();
-
-	for (i = 0; i < count; ++i) {
-		char buf[256];
-
-		if (probes[i].prog) {
-			snprintf(buf, sizeof(buf), "%s", probes[i].prog);
-		} else {
-			snprintf(buf, sizeof(buf), "kprobe/%s%s",
-				 probes[i].func,
-				 probes[i].retprobe ? "_ret" : "");
-		}
-
-		prog = bpf_object__find_program_by_title(obj, buf);
-		if (!prog) {
-			printf("Failed to get prog in obj file\n");
-			rc = 1;
-			continue;
-		}
-		prog_fd = bpf_program__fd(prog);
-
-
-		if (attr_type < 0) {
-			probes[i].fd = kprobe_perf_event_legacy(prog_fd,
-								probes[i].func,
-								probes[i].retprobe);
-		} else {
-			probes[i].fd = kprobe_perf_event(prog_fd,
-							 probes[i].func,
-							 probes[i].retprobe,
-							 attr_type);
-		}
-		if (probes[i].fd < 0) {
-			fprintf(stderr,
-				"Failed to create perf_event on %s\n",
-				probes[i].func);
-			rc = 1;
-		}
-	}
-
-	return rc;
-}
-
-void kprobe_cleanup(struct kprobe_data *probes, unsigned int count)
-{
-	unsigned int i;
-	int attr_type;
-
-	attr_type = kprobe_event_type();
-	for (i = 0; i < count; ++i) {
-		if (probes[i].fd < 0)
-			continue;
-
-		close(probes[i].fd);
-		if (attr_type < 0) {
-			kprobe_perf_event_legacy(-1, probes[i].func,
-						 probes[i].retprobe);
-		}
-	}
-}
-
 static int syscall_event_id(const char *name)
 {
 	char sysname[PATH_MAX];
 
 	snprintf(sysname, sizeof(sysname), "syscalls/%s", name);
 
-	return tp_event_id(sysname, false);
+	return tp_event_id(sysname);
 }
 
 int perf_event_syscall(int prog_fd, const char *name)
@@ -711,7 +513,7 @@ int perf_event_syscall(int prog_fd, const char *name)
 	if (id < 0)
 		return 1;
 
-	return tp_perf_event(prog_fd, id);
+	return perf_event_tp_set_prog(prog_fd, id);
 }
 
 void perf_set_page_cnt(int cnt)
