@@ -703,7 +703,7 @@ static int syscall_event_id(const char *name)
 	return tp_event_id(sysname, false);
 }
 
-int syscall_perf_event(int prog_fd, const char *name)
+int perf_event_syscall(int prog_fd, const char *name)
 {
 	int id;
 

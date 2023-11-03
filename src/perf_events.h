@@ -18,6 +18,8 @@ void kprobe_cleanup(struct kprobe_data *probes, unsigned int count);
 
 typedef enum bpf_perf_event_ret (*perf_event_print_fn)(void *data, int size);
 
+int perf_event_syscall(int prog_fd, const char *name);
+
 /* attach channel map to perf */
 int perf_event_configure(struct bpf_object *obj, int nevents);
 
