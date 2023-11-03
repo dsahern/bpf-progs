@@ -192,7 +192,7 @@ int main(int argc, char **argv)
 	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 		goto out;
 
-	if (configure_perf_event_channel(obj, nevents))
+	if (perf_event_configure(obj, nevents))
 		goto out;
 
 	/* main event loop */

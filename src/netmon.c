@@ -1129,7 +1129,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		break;
 	}
 
-	if (configure_perf_event_channel(obj, nevents))
+	if (perf_event_configure(obj, nevents))
 		goto out;
 
 	if (do_hist)

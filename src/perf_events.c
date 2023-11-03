@@ -314,7 +314,7 @@ static int perf_event_output(int map_fd, int ncpus, int nevents)
 	return 0;
 }
 
-int configure_perf_event_channel(struct bpf_object *obj, int nevents)
+int perf_event_configure(struct bpf_object *obj, int nevents)
 {
 	struct bpf_map *map;
 	int map_fd, i;

@@ -19,7 +19,7 @@ void kprobe_cleanup(struct kprobe_data *probes, unsigned int count);
 typedef enum bpf_perf_event_ret (*perf_event_print_fn)(void *data, int size);
 
 /* attach channel map to perf */
-int configure_perf_event_channel(struct bpf_object *obj, int nevents);
+int perf_event_configure(struct bpf_object *obj, int nevents);
 
 void perf_set_page_cnt(int cnt);
 

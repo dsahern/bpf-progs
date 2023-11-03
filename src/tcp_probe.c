@@ -297,7 +297,7 @@ int main(int argc, char **argv)
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	if (configure_perf_event_channel(obj, nevents))
+	if (perf_event_configure(obj, nevents))
 		return 1;
 
 	print_header();
