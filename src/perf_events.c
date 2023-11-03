@@ -284,33 +284,6 @@ static int perf_event_poller_multi(int *fds,
 	return ret;
 }
 
-static int output_perf_event_cpu(int map_fd, int cpu, int nevents)
-{
-	struct perf_event_attr attr = {
-		.sample_type = PERF_SAMPLE_RAW,
-		.type = PERF_TYPE_SOFTWARE,
-		.config = PERF_COUNT_SW_BPF_OUTPUT,
-		.size = sizeof(attr),
-		.wakeup_events = nevents, /* get an fd notification for every event */
-	};
-	int key = cpu;
-
-	pmu_fds[0] = sys_perf_event_open(&attr, cpu, 0);
-	if (pmu_fds[0] < 0) {
-		fprintf(stderr, "sys_perf_event_open failed: %d: %s\n",
-			errno, strerror(errno));
-		return -1;
-	}
-	if (bpf_map_update_elem(map_fd, &key, &pmu_fds[0], BPF_ANY)) {
-		fprintf(stderr, "bpf_map_update_elem failed\n");
-		return -1;
-	}
-
-	ioctl(pmu_fds[0], PERF_EVENT_IOC_ENABLE, 0);
-
-	return 0;
-}
-
 static int output_perf_event(int map_fd, int ncpus, int nevents)
 {
 	struct perf_event_attr attr = {
@@ -337,31 +310,6 @@ static int output_perf_event(int map_fd, int ncpus, int nevents)
 		}
 		ioctl(pmu_fds[i], PERF_EVENT_IOC_ENABLE, 0);
 	}
-
-	return 0;
-}
-
-/*
- * obj is expected to have a map named "channel".
- * attach event channel to perf event to get output
- */
-int configure_perf_event_channel_cpu(struct bpf_object *obj, int nevents,
-				     int cpu)
-{
-	struct bpf_map *map;
-	int map_fd;
-
-	map = bpf_object__find_map_by_name(obj, "channel");
-	if (!map) {
-		fprintf(stderr, "Failed to get channel map in obj file\n");
-		return 1;
-	}
-
-	map_fd = bpf_map__fd(map);
-
-	if (output_perf_event_cpu(map_fd, cpu, nevents) ||
-	    perf_event_mmap_header(pmu_fds[0], &headers[0]) < 0)
-		return 1;
 
 	return 0;
 }
