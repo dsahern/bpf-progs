@@ -284,7 +284,7 @@ static int perf_event_poller_multi(int *fds,
 	return ret;
 }
 
-static int output_perf_event(int map_fd, int ncpus, int nevents)
+static int perf_event_output(int map_fd, int ncpus, int nevents)
 {
 	struct perf_event_attr attr = {
 		.sample_type = PERF_SAMPLE_RAW,
@@ -331,7 +331,7 @@ int configure_perf_event_channel(struct bpf_object *obj, int nevents)
 
 	map_fd = bpf_map__fd(map);
 
-	if (output_perf_event(map_fd, numcpus, nevents))
+	if (perf_event_output(map_fd, numcpus, nevents))
 		return 1;
 
 	for (i = 0; i < numcpus; i++) {
