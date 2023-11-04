@@ -305,7 +305,7 @@ static int perf_event_output(struct perf_event_ctx *ctx, int map_fd,
 }
 
 int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
-			 int nevents)
+			 const char *map_name, int nevents)
 {
 	struct bpf_map *map;
 	int map_fd, i;
@@ -334,9 +334,9 @@ int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 	if (!ctx->output_fn)
 		ctx->output_fn = __handle_bpf_output;
 
-	map = bpf_object__find_map_by_name(obj, "channel");
+	map = bpf_object__find_map_by_name(obj, map_name);
 	if (!map) {
-		fprintf(stderr, "Failed to get channel map in obj file\n");
+		fprintf(stderr, "Failed to get map in obj file\n");
 		goto err_out;
 	}
 

@@ -542,7 +542,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (perf_event_configure(&ctx, obj, nevents))
+	if (perf_event_configure(&ctx, obj, "channel", nevents))
 		return 1;
 
 	/* main event loop */

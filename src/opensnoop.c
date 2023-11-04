@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 		goto out;
 
-	if (perf_event_configure(&ctx, obj, nevents))
+	if (perf_event_configure(&ctx, obj, "channel", nevents))
 		goto out;
 
 	/* main event loop */

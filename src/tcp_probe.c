@@ -300,7 +300,7 @@ int main(int argc, char **argv)
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	if (perf_event_configure(&ctx, obj, nevents))
+	if (perf_event_configure(&ctx, obj, "channel", nevents))
 		return 1;
 
 	print_header();

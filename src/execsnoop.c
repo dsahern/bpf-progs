@@ -330,7 +330,7 @@ int main(int argc, char **argv)
 	if (do_tracepoint(obj, tps))
 		goto out;
 
-	if (perf_event_configure(&ctx, obj, nevents))
+	if (perf_event_configure(&ctx, obj, "channel", nevents))
 		goto out;
 
 	print_header();
