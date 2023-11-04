@@ -942,9 +942,9 @@ out:
 	return LIBBPF_PERF_EVENT_CONT;
 }
 
-static int pktdrop_complete(void)
+static int pktdrop_complete(struct perf_event_ctx *ctx)
 {
-	process_events();
+	perf_event_process_events(ctx);
 
 	if (do_hist && update_display) {
 		show_hist();

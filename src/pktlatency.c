@@ -403,11 +403,11 @@ static int pktlat_setup_ctl_map(void)
 	return 0;
 }
 
-static int pktlat_process_events(void)
+static int pktlat_process_events(struct perf_event_ctx *ctx)
 {
 	__u64 t_mono = get_time_ns(CLOCK_MONOTONIC);
 
-	process_events();
+	perf_event_process_events(ctx);
 
 	if (t_mono > ptp_mono_ref + display_rate) {
 		pktlat_setup_ctl_map();

@@ -16,7 +16,7 @@ struct perf_event_ctx {
 					     void *data, int size);
 
 	/* called at the end of a polling loop; non-0 terminates polling */
-	int (*complete_fn)(void);
+	int (*complete_fn)(struct perf_event_ctx *ctx);
 
 	int *pmu_fds;
 	struct perf_event_mmap_page **headers;
@@ -41,4 +41,7 @@ int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 void perf_event_close(struct perf_event_ctx *ctx);
 
 int perf_event_loop(struct perf_event_ctx *ctx);
+
+void perf_event_process_events(struct perf_event_ctx *ctx);
+
 #endif

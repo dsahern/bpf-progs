@@ -210,9 +210,9 @@ out:
 	sk->data.snd_una = data->snd_una;
 }
 
-static int tcpprobe_complete(void)
+static int tcpprobe_complete(struct perf_event_ctx *ctx)
 {
-	process_events();
+	perf_event_process_events(ctx);
 	if (max_samples && num_samples >= max_samples)
 		done = true;
 

@@ -109,7 +109,7 @@ static void set_round_time(void)
 	round_time = (__u64) ts_to_ull(&ts);
 }
 
-void process_events(void)
+void perf_event_process_events(struct perf_event_ctx *ctx)
 {
 	__u64 end_time = round_time;
 	struct rb_root *rb_root = &events;
@@ -264,7 +264,7 @@ static int perf_event_poller_multi(struct perf_event_ctx *ctx)
 				break;
 		}
 
-		if (ctx->complete_fn && ctx->complete_fn())
+		if (ctx->complete_fn && ctx->complete_fn(ctx))
 			break;
 	}
 	free(buf);

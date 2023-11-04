@@ -137,10 +137,10 @@ static void process_event(struct data *data)
 	}
 }
 
-static int opensnoop_complete(void)
+static int opensnoop_complete(struct perf_event_ctx *ctx)
 {
 	show_header = true;
-	process_events();
+	perf_event_process_events(ctx);
 
 	return done;
 }

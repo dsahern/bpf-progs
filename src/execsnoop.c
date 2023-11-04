@@ -213,9 +213,9 @@ static void process_event(struct data *data)
 	}
 }
 
-static int execsnoop_complete(void)
+static int execsnoop_complete(struct perf_event_ctx *ctx)
 {
-	process_events();
+	perf_event_process_events(ctx);
 	return done;
 }
 
