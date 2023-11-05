@@ -2,8 +2,6 @@
 #ifndef _OVSLATENCY_H_
 #define _OVSLATENCY_H_
 
-#define MAX_CPUS	128
-
 #define OVS_BUCKET_0    10
 #define OVS_BUCKET_1    25
 #define OVS_BUCKET_2    50

@@ -21,8 +21,6 @@
 #include "linux/kernel.h"
 #include "timestamps.h"
 
-#define MAX_CPUS        128
-
 struct data {
 	__u64 time;
 	__u32 cpu;

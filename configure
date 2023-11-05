@@ -267,6 +267,8 @@ done
 echo "# Generated config" >$CONFIG
 quiet_config >> $CONFIG
 
+echo "CFLAGS = -D\"MAX_CPUS=128\"" >> $CONFIG
+
 check_toolchain
 
 check_libbpf || exit 1

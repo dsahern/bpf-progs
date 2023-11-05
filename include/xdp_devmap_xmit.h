@@ -2,8 +2,6 @@
 #ifndef _DEVMAP_XMIT_H_
 #define _DEVMAP_XMIT_H_
 
-#define MAX_CPUS        128
-
 #define DEVMAP_BUCKETS 10
 struct devmap_xmit_hist {
         __u64 buckets[DEVMAP_BUCKETS];

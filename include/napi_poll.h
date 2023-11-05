@@ -2,8 +2,6 @@
 #ifndef _NET_NAPI_POLL_H_
 #define _NET_NAPI_POLL_H_
 
-#define MAX_CPUS        128
-
 #define NAPI_BUCKETS  9
 struct napi_poll_hist {
         __u64 buckets[NAPI_BUCKETS];

@@ -2,8 +2,6 @@
 #ifndef _PKTLATENCY_H_
 #define _PKTLATENCY_H_
 
-#define MAX_CPUS	128
-
 #define PKTLAT_BUCKET_0    25
 #define PKTLAT_BUCKET_1    50
 #define PKTLAT_BUCKET_2    75

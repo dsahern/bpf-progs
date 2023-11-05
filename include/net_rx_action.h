@@ -2,8 +2,6 @@
 #ifndef _NET_RX_LATENCY_H_
 #define _NET_RX_LATENCY_H_
 
-#define MAX_CPUS	128
-
 #define NET_RX_BUCKET_0     5
 #define NET_RX_BUCKET_1    10
 #define NET_RX_BUCKET_2    25

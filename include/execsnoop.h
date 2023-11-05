@@ -2,7 +2,6 @@
 #ifndef _EXECSNOOP_H_
 #define _EXECSNOOP_H_
 
-#define MAX_CPUS	128
 #define ARGSIZE		128
 #define MAXARG		20
 #define TASK_COMM_LEN	16

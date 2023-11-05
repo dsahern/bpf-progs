@@ -2,8 +2,6 @@
 #ifndef _PKTDROP_H_
 #define _PKTDROP_H_
 
-#define MAX_CPUS	128
-
 enum event_type {
 	EVENT_SAMPLE,
 	EVENT_EXIT,

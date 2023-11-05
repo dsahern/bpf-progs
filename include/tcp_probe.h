@@ -2,8 +2,6 @@
 #ifndef _TCP_PROBE_H_
 #define _TCP_PROBE_H_
 
-#define MAX_CPUS        128
-
 struct data {
 	__u64 time;
 	union {
