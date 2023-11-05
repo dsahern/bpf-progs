@@ -19,4 +19,6 @@ void kprobe_cleanup(struct kprobe_data *probes, unsigned int count);
 int kprobe_perf_event(int prog_fd, const char *func, int retprobe,
 		      int attr_type);
 
+int kprobe_event_type(void);
+
 #endif

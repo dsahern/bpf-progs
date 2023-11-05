@@ -20,9 +20,8 @@
 #include "opensnoop.h"
 #include "libbpf_helpers.h"
 #include "perf_events.h"
+#include "kprobes.h"
 #include "timestamps.h"
-
-#include "perf_events.c"
 
 static bool print_time = true;
 static bool print_dt;

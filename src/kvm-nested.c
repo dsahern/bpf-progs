@@ -17,6 +17,8 @@
 
 #include "libbpf_helpers.h"
 #include "perf_events.h"
+#include "kprobes.h"
+#include "linux/kernel.h"
 #include "timestamps.h"
 
 #define MAX_CPUS        128
@@ -25,8 +27,6 @@ struct data {
 	__u64 time;
 	__u32 cpu;
 };
-
-#include "perf_events.c"
 
 bool done;
 
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 			goto out;
 	} else {
-		if (do_tracepoint(obj, tps))
+		if (configure_tracepoints(obj, tps))
 			goto out;
 	}
 

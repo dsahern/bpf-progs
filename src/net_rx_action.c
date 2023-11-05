@@ -18,7 +18,9 @@
 #include "net_rx_action.h"
 #include "libbpf_helpers.h"
 #include "perf_events.h"
+#include "kprobes.h"
 #include "timestamps.h"
+#include "linux/kernel.h"
 
 struct data {
 	__u64 time;
@@ -26,8 +28,6 @@ struct data {
 };
 
 static bool done;
-
-#include "perf_events.c"
 
 static void dump_buckets(__u64 *buckets, __u64 *prev_buckets)
 {

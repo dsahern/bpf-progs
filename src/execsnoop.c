@@ -6,11 +6,12 @@
 #include <stdbool.h>
 #include <linux/bpf.h>
 #include <linux/rbtree.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include <libgen.h>
+#include <unistd.h>
 #include <errno.h>
 
 #include <bpf/bpf.h>
@@ -19,9 +20,8 @@
 #include "execsnoop.h"
 #include "libbpf_helpers.h"
 #include "perf_events.h"
+#include "kprobes.h"
 #include "timestamps.h"
-
-#include "perf_events.c"
 
 static bool print_time = true;
 static bool print_dt;
@@ -334,11 +334,11 @@ int main(int argc, char **argv)
 	if (use_kprobe) {
 		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 			goto out;
-	} else if (do_tracepoint(obj, tps_exec)) {
+	} else if (configure_tracepoints(obj, tps_exec)) {
 		goto out;
 	}
 
-	if (do_tracepoint(obj, tps))
+	if (configure_tracepoints(obj, tps))
 		goto out;
 
 	if (perf_event_configure(&ctx, obj, "channel", nevents))

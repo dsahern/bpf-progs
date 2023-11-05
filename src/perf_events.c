@@ -24,6 +24,7 @@
 #include <bpf/bpf.h>
 
 #include "perf_events.h"
+#include "timestamps.h"
 
 #include "kprobes.c"
 
@@ -440,7 +441,7 @@ int tracepoint_perf_event(int prog_fd, const char *name)
 /* tps is a NULL terminated array of tracepoint names.
  * bpf program is expected to be named tracepoint/%s
  */
-int do_tracepoint(struct bpf_object *obj, const char *tps[])
+int configure_tracepoints(struct bpf_object *obj, const char *tps[])
 {
         struct bpf_program *prog;
         int prog_fd, fd;

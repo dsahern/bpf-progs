@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
+#include <linux/list.h>
 #include <linux/perf_event.h>
 #include <linux/bpf.h>
 #include <stdio.h>
@@ -13,6 +14,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <libgen.h>
+#include <unistd.h>
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
@@ -23,8 +25,6 @@
 #include "perf_events.h"
 #include "timestamps.h"
 #include "tp_verify.h"
-
-#include "perf_events.c"
 
 struct tp_ctx tcp_probe_tp_ctx[] = {
 	TP_ARG(saddr,         8, 28, tcp_probe_args, s_in6),
@@ -298,7 +298,7 @@ int main(int argc, char **argv)
 	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
 
-	if (do_tracepoint(obj, tps))
+	if (configure_tracepoints(obj, tps))
 		return 1;
 
 	if (signal(SIGINT, sig_handler) ||

@@ -27,8 +27,6 @@ struct data {
 
 static bool done;
 
-#include "perf_events.c"
-
 static void dump_buckets(__u64 *buckets, __u64 *prev_buckets)
 {
 	__u64 diff[DEVMAP_BUCKETS];
@@ -151,7 +149,7 @@ int main(int argc, char **argv)
 	/* make sure index 0 entry exists */
 	bpf_map_update_elem(hist_map_fd, &idx, &hist, BPF_ANY);
 
-	if (do_tracepoint(obj, tps))
+	if (configure_tracepoints(obj, tps))
 		return 1;
 
 	while (!done) {

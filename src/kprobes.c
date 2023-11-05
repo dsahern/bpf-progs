@@ -103,7 +103,7 @@ static int kprobe_perf_event_legacy(int prog_fd, const char *func,
 	return perf_event_tp_set_prog(prog_fd, id);
 }
 
-static int kprobe_event_type(void)
+int kprobe_event_type(void)
 {
 	char filename[] = "/sys/bus/event_source/devices/kprobe/type";
 	static int kprobe_type = -1;

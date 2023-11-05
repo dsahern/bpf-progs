@@ -9,12 +9,15 @@
 #include <linux/rbtree.h>
 #include <sys/time.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <libgen.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <unistd.h>
 #include <errno.h>
-#include <libgen.h>
 #include <locale.h>
 
 #include <bpf/bpf.h>
@@ -24,8 +27,6 @@
 #include "libbpf_helpers.h"
 #include "perf_events.h"
 #include "timestamps.h"
-
-#include "perf_events.c"
 
 struct task {
 	struct rb_node rb_node;
@@ -518,7 +519,7 @@ int main(int argc, char **argv)
 	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
 
-	rc = do_tracepoint(obj, tps);
+	rc = configure_tracepoints(obj, tps);
 	if (rc)
 		return rc;
 

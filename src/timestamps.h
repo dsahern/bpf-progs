@@ -2,6 +2,8 @@
 #ifndef __TIMESTAMPS_H
 #define __TIMESTAMPS_H
 
+#include <time.h>
+
 #define USEC_PER_SEC    1000000ULL
 #define NSEC_PER_SEC    1000000000ULL
 #define NSEC_PER_MSEC   1000000ULL

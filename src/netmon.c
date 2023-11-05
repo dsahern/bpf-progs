@@ -8,16 +8,18 @@
 #include <linux/bpf.h>
 #include <linux/if_arp.h>
 #include <linux/ipv6.h>
+#include <linux/list.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <arpa/inet.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <unistd.h>
 #include <errno.h>
-#include <libgen.h>
 #include <locale.h>
 #define PCAP_DONT_INCLUDE_PCAP_BPF_H
 #include <pcap.h>
@@ -29,10 +31,9 @@
 #include "libbpf_helpers.h"
 #include "ksyms.h"
 #include "perf_events.h"
+#include "kprobes.h"
 #include "str_utils.h"
 #include "timestamps.h"
-
-#include "perf_events.c"
 
 static __u64 display_rate = 10;
 static bool update_display;
@@ -1117,7 +1118,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
 		return 1;
 
-	if (do_tracepoint(obj, tps))
+	if (configure_tracepoints(obj, tps))
 		return 1;
 
 	rc = 1;

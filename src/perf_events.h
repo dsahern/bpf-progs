@@ -37,6 +37,7 @@ int sys_perf_event_open(struct perf_event_attr *attr,
 			int cpu, unsigned long flags);
 
 int perf_event_tp_set_prog(int prog_fd, __u64 config);
+int configure_tracepoints(struct bpf_object *obj, const char *tps[]);
 
 int perf_event_syscall(int prog_fd, const char *name);
 
