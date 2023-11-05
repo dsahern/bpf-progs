@@ -52,6 +52,7 @@ LIBBPF=-lbpf
 endif
 
 COMMON += $(OBJDIR)perf_events.o
+COMMON += $(OBJDIR)kprobes.o
 COMMON += $(OBJDIR)timestamps.o
 COMMON += $(OBJDIR)libbpf_helpers.o
 COMMON += $(OBJDIR)str_utils.o

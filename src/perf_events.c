@@ -15,18 +15,18 @@
 #include <sys/syscall.h>
 #include <sys/sysinfo.h>
 #include <sys/types.h>
-#include <time.h>
-#include <limits.h>
 #include <fcntl.h>
-#include <errno.h>
+#include <limits.h>
 #include <poll.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <unistd.h>
+#include <errno.h>
 #include <bpf/bpf.h>
 
 #include "perf_events.h"
 #include "timestamps.h"
-
-#include "kprobes.c"
 
 /*
  * time sorted list of events
