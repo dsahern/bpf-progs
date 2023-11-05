@@ -32,7 +32,6 @@
  */
 static void process_event(struct data *data);
 
-static int pmu_fds[MAX_CPUS];
 static struct perf_event_mmap_page *headers[MAX_CPUS];
 
 /*
@@ -144,9 +143,9 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 	struct data *data = _data;
 	struct event *event;
 
-	if (ctx->numcpus && data->cpu >= ctx->numcpus) {
-		fprintf(stderr, "CPU in event (%d) is > numcpus (%d)\n",
-			data->cpu, ctx->numcpus);
+	if (ctx->num_cpus && data->cpu >= ctx->num_cpus) {
+		fprintf(stderr, "CPU in event (%d) is > num_cpus (%d)\n",
+			data->cpu, ctx->num_cpus);
 		return LIBBPF_PERF_EVENT_ERROR;
 	}
 
@@ -232,8 +231,7 @@ bpf_perf_event_print(struct perf_event_header *hdr, void *private_data)
 }
 
 static int perf_event_poller_multi(struct perf_event_ctx *ctx,
-				   int *fds,
-				   int num_fds, perf_event_fn_t output_fn,
+				   perf_event_fn_t output_fn,
 				   void (*round_start_fn)(void),
 				   int (*round_complete_fn)(void))
 {
@@ -249,22 +247,22 @@ static int perf_event_poller_multi(struct perf_event_ctx *ctx,
 	if (!output_fn || !ctx->fn)
 		ctx->fn = __handle_bpf_output;
 
-	pfds = calloc(num_fds, sizeof(*pfds));
+	pfds = calloc(ctx->num_cpus, sizeof(*pfds));
 	if (!pfds)
 		return LIBBPF_PERF_EVENT_ERROR;
 
-	for (i = 0; i < num_fds; i++) {
-		pfds[i].fd = fds[i];
+	for (i = 0; i < ctx->num_cpus; i++) {
+		pfds[i].fd = ctx->pmu_fds[i];
 		pfds[i].events = POLLIN;
 	}
 
 	for (;;) {
-		poll(pfds, num_fds, timeout);
+		poll(pfds, ctx->num_cpus, timeout);
 
 		if (round_start_fn)
 			round_start_fn();
 
-		for (i = 0; i < num_fds; i++) {
+		for (i = 0; i < ctx->num_cpus; i++) {
 			ret = bpf_perf_event_read_simple(headers[i],
 							 page_cnt * page_size,
 							 page_size, &buf, &len,
@@ -283,7 +281,8 @@ static int perf_event_poller_multi(struct perf_event_ctx *ctx,
 	return ret;
 }
 
-static int perf_event_output(int map_fd, int ncpus, int nevents)
+static int perf_event_output(struct perf_event_ctx *ctx, int map_fd,
+			     int nevents)
 {
 	struct perf_event_attr attr = {
 		.sample_type = PERF_SAMPLE_RAW,
@@ -294,20 +293,20 @@ static int perf_event_output(int map_fd, int ncpus, int nevents)
 	};
 	int i;
 
-	for (i = 0; i < ncpus; i++) {
+	for (i = 0; i < ctx->num_cpus; i++) {
 		int key = i;
 
-		pmu_fds[i] = sys_perf_event_open(&attr, i, 0);
-		if (pmu_fds[i] < 0) {
+		ctx->pmu_fds[i] = sys_perf_event_open(&attr, i, 0);
+		if (ctx->pmu_fds[i] < 0) {
 			fprintf(stderr, "sys_perf_event_open failed: %d: %s\n",
 				errno, strerror(errno));
 			return -1;
 		}
-		if (bpf_map_update_elem(map_fd, &key, &pmu_fds[i], BPF_ANY)) {
+		if (bpf_map_update_elem(map_fd, &key, &ctx->pmu_fds[i], BPF_ANY)) {
 			fprintf(stderr, "bpf_map_update_elem failed\n");
 			return -1;
 		}
-		ioctl(pmu_fds[i], PERF_EVENT_IOC_ENABLE, 0);
+		ioctl(ctx->pmu_fds[i], PERF_EVENT_IOC_ENABLE, 0);
 	}
 
 	return 0;
@@ -319,32 +318,41 @@ int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 	struct bpf_map *map;
 	int map_fd, i;
 
-	ctx->numcpus = get_nprocs() ? : MAX_CPUS;
-	if (ctx->numcpus > MAX_CPUS)
-		ctx->numcpus = MAX_CPUS;
+	ctx->num_cpus = get_nprocs() ? : MAX_CPUS;
+	if (ctx->num_cpus > MAX_CPUS)
+		ctx->num_cpus = MAX_CPUS;
 
 	ctx->page_size = getpagesize();
 
 	if (!ctx->page_cnt)
 		ctx->page_cnt = 256;  /* pages per mmap */
 
+	ctx->pmu_fds = calloc(ctx->num_cpus, sizeof(int));
+	if (!ctx->pmu_fds) {
+		fprintf(stderr, "Failed to allocate memory for pmu fds\n");
+		return 1;
+	}
+
 	map = bpf_object__find_map_by_name(obj, "channel");
 	if (!map) {
 		fprintf(stderr, "Failed to get channel map in obj file\n");
-		return 1;
+		goto err_out;
 	}
 
 	map_fd = bpf_map__fd(map);
 
-	if (perf_event_output(map_fd, ctx->numcpus, nevents))
-		return 1;
+	if (perf_event_output(ctx, map_fd, nevents))
+		goto err_out;
 
-	for (i = 0; i < ctx->numcpus; i++) {
-		if (perf_event_mmap_header(ctx, pmu_fds[i], &headers[i]) < 0)
-			return 1;
+	for (i = 0; i < ctx->num_cpus; i++) {
+		if (perf_event_mmap_header(ctx, ctx->pmu_fds[i], &headers[i]) < 0)
+			goto err_out;
 	}
 
 	return 0;
+err_out:
+	free(ctx->pmu_fds);
+	return 1;
 }
 
 void perf_event_close(struct perf_event_ctx *ctx)
@@ -354,10 +362,12 @@ void perf_event_close(struct perf_event_ctx *ctx)
 	printf("total events: %llu\n", ctx->total_events);
 	printf("drops due to time collision: %llu\n", ctx->time_drops);
 
-	for (i = 0; i < ctx->numcpus; i++) {
-		ioctl(pmu_fds[i], PERF_EVENT_IOC_DISABLE, 0);
-		close(pmu_fds[i]);
+	for (i = 0; i < ctx->num_cpus; i++) {
+		ioctl(ctx->pmu_fds[i], PERF_EVENT_IOC_DISABLE, 0);
+		close(ctx->pmu_fds[i]);
 	}
+
+	free(ctx->pmu_fds);
 }
 
 int perf_event_tp_set_prog(int prog_fd, __u64 config)
@@ -524,14 +534,6 @@ int perf_event_loop(struct perf_event_ctx *ctx,
 		    perf_event_fn_t output_fn,
 		    void (*start_fn)(void), int (*complete_fn)(void))
 {
-	return perf_event_poller_multi(ctx, pmu_fds, ctx->numcpus,
+	return perf_event_poller_multi(ctx,
 				       output_fn, start_fn, complete_fn);
-}
-
-int perf_event_loop_cpu(struct perf_event_ctx *ctx,
-			perf_event_fn_t output_fn,
-			 void (*start_fn)(void), int (*complete_fn)(void))
-{
-	return perf_event_poller_multi(ctx, pmu_fds, 1,
-                                       output_fn, start_fn, complete_fn);
 }

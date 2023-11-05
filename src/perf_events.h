@@ -14,7 +14,8 @@ typedef enum bpf_perf_event_ret (*perf_event_fn_t)(struct perf_event_ctx *ctx,
 
 struct perf_event_ctx {
 	perf_event_fn_t fn;
-	int numcpus;
+	int *pmu_fds;
+	int num_cpus;
 	int page_size;
 	int page_cnt;  /* pages per mmap */
 	__u64 total_events;
