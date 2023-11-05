@@ -901,7 +901,7 @@ static void process_event(struct data *data)
 	/* nothing to do */
 }
 
-static int handle_bpf_output(void *_data, int size)
+static int handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size)
 {
 	struct data *data = _data;
 	struct ksym_s *sym;

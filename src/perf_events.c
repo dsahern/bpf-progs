@@ -145,7 +145,7 @@ void process_events(void)
 /*
  * Add event to time sorted backlog queue
  */
-static int __handle_bpf_output(void *_data, int size)
+static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size)
 {
 	struct data *data = _data;
 	struct event *event;
@@ -214,11 +214,11 @@ static enum bpf_perf_event_ret
 bpf_perf_event_print(struct perf_event_header *hdr, void *private_data)
 {
 	struct perf_event_sample *e = (struct perf_event_sample *)hdr;
-	perf_event_print_fn fn = private_data;
+	struct perf_event_ctx *ctx = private_data;
 	int ret;
 
 	if (e->header.type == PERF_RECORD_SAMPLE) {
-		ret = fn(e->data, e->size);
+		ret = ctx->fn(ctx, e->data, e->size);
 		if (ret != LIBBPF_PERF_EVENT_CONT)
 			return ret;
 	} else if (e->header.type == PERF_RECORD_LOST) {
@@ -237,11 +237,12 @@ bpf_perf_event_print(struct perf_event_header *hdr, void *private_data)
 }
 
 static int perf_event_poller_multi(int *fds,
-				   int num_fds, perf_event_print_fn output_fn,
+				   int num_fds, perf_event_fn_t output_fn,
 				   void (*round_start_fn)(void),
 				   int (*round_complete_fn)(void))
 {
 	enum bpf_perf_event_ret ret = LIBBPF_PERF_EVENT_DONE;
+	struct perf_event_ctx ctx = { .fn = output_fn };
 	struct pollfd *pfds;
 	int timeout = 1000;
 	void *buf = NULL;
@@ -249,7 +250,7 @@ static int perf_event_poller_multi(int *fds,
 	int i;
 
 	if (!output_fn)
-		output_fn = __handle_bpf_output;
+		ctx.fn = __handle_bpf_output;
 
 	pfds = calloc(num_fds, sizeof(*pfds));
 	if (!pfds)
@@ -271,7 +272,7 @@ static int perf_event_poller_multi(int *fds,
 							 page_cnt * page_size,
 							 page_size, &buf, &len,
 							 bpf_perf_event_print,
-							 output_fn);
+							 &ctx);
 			if (ret != LIBBPF_PERF_EVENT_CONT)
 				break;
 		}
@@ -521,14 +522,14 @@ void perf_set_page_cnt(int cnt)
 	page_cnt = cnt;
 }
 
-int perf_event_loop(perf_event_print_fn output_fn,
+int perf_event_loop(perf_event_fn_t output_fn,
 		    void (*start_fn)(void), int (*complete_fn)(void))
 {
 	return perf_event_poller_multi(pmu_fds, numcpus,
 				       output_fn, start_fn, complete_fn);
 }
 
-int perf_event_loop_cpu(perf_event_print_fn output_fn,
+int perf_event_loop_cpu(perf_event_fn_t output_fn,
 			 void (*start_fn)(void), int (*complete_fn)(void))
 {
 	return perf_event_poller_multi(pmu_fds, 1,
