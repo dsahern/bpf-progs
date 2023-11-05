@@ -210,7 +210,7 @@ bpf_perf_event_print(struct perf_event_header *hdr, void *private_data)
 	int ret;
 
 	if (e->header.type == PERF_RECORD_SAMPLE) {
-		ret = ctx->fn(ctx, e->data, e->size);
+		ret = ctx->output_fn(ctx, e->data, e->size);
 		if (ret != LIBBPF_PERF_EVENT_CONT)
 			return ret;
 	} else if (e->header.type == PERF_RECORD_LOST) {
@@ -228,10 +228,7 @@ bpf_perf_event_print(struct perf_event_header *hdr, void *private_data)
 	return LIBBPF_PERF_EVENT_CONT;
 }
 
-static int perf_event_poller_multi(struct perf_event_ctx *ctx,
-				   perf_event_fn_t output_fn,
-				   void (*round_start_fn)(void),
-				   int (*round_complete_fn)(void))
+static int perf_event_poller_multi(struct perf_event_ctx *ctx)
 {
 	enum bpf_perf_event_ret ret = LIBBPF_PERF_EVENT_DONE;
 	int page_size = ctx->page_size;
@@ -241,9 +238,6 @@ static int perf_event_poller_multi(struct perf_event_ctx *ctx,
 	void *buf = NULL;
 	size_t len = 0;
 	int i;
-
-	if (!output_fn || !ctx->fn)
-		ctx->fn = __handle_bpf_output;
 
 	pfds = calloc(ctx->num_cpus, sizeof(*pfds));
 	if (!pfds)
@@ -257,8 +251,8 @@ static int perf_event_poller_multi(struct perf_event_ctx *ctx,
 	for (;;) {
 		poll(pfds, ctx->num_cpus, timeout);
 
-		if (round_start_fn)
-			round_start_fn();
+		if (ctx->start_fn)
+			ctx->start_fn();
 
 		for (i = 0; i < ctx->num_cpus; i++) {
 			ret = bpf_perf_event_read_simple(ctx->headers[i],
@@ -270,7 +264,7 @@ static int perf_event_poller_multi(struct perf_event_ctx *ctx,
 				break;
 		}
 
-		if (round_complete_fn && round_complete_fn())
+		if (ctx->complete_fn && ctx->complete_fn())
 			break;
 	}
 	free(buf);
@@ -336,6 +330,9 @@ int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 		fprintf(stderr, "Failed to allocate memory for mmap_page\n");
 		goto err_out;
 	}
+
+	if (!ctx->output_fn)
+		ctx->output_fn = __handle_bpf_output;
 
 	map = bpf_object__find_map_by_name(obj, "channel");
 	if (!map) {
@@ -540,10 +537,7 @@ int perf_event_syscall(int prog_fd, const char *name)
 	return perf_event_tp_set_prog(prog_fd, id);
 }
 
-int perf_event_loop(struct perf_event_ctx *ctx,
-		    perf_event_fn_t output_fn,
-		    void (*start_fn)(void), int (*complete_fn)(void))
+int perf_event_loop(struct perf_event_ctx *ctx)
 {
-	return perf_event_poller_multi(ctx,
-				       output_fn, start_fn, complete_fn);
+	return perf_event_poller_multi(ctx);
 }

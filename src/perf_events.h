@@ -7,13 +7,17 @@
 
 #define TRACINGFS "/sys/kernel/debug/tracing"
 
-struct perf_event_ctx;
-
-typedef enum bpf_perf_event_ret (*perf_event_fn_t)(struct perf_event_ctx *ctx,
-						   void *data, int size);
-
 struct perf_event_ctx {
-	perf_event_fn_t fn;
+	/* called before starting data collection */
+	void (*start_fn)(void);
+
+	/* called for each event */
+	enum bpf_perf_event_ret (*output_fn)(struct perf_event_ctx *ctx,
+					     void *data, int size);
+
+	/* called at the end of a polling loop; non-0 terminates polling */
+	int (*complete_fn)(void);
+
 	int *pmu_fds;
 	struct perf_event_mmap_page **headers;
 	int num_cpus;
@@ -36,16 +40,5 @@ int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 
 void perf_event_close(struct perf_event_ctx *ctx);
 
-int perf_event_loop(struct perf_event_ctx *ctx,
-		    perf_event_fn_t output_fn,
-                    void (*round_start_fn)(void),
-		    int (*round_complete_fn)(void));
-
-/* if output_fn == NULL default output function is used to
- * queue events to a time sorted event log
- */
-int perf_event_loop_cpu(struct perf_event_ctx *ctx,
-			perf_event_fn_t output_fn,
-			void (*round_start_fn)(void),
-			int (*round_complete_fn)(void));
+int perf_event_loop(struct perf_event_ctx *ctx);
 #endif

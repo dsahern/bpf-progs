@@ -239,7 +239,9 @@ int main(int argc, char **argv)
 {
 	char *objfile = "tcp_probe.o";
 	struct bpf_prog_load_attr prog_load_attr = { };
-	struct perf_event_ctx ctx = {};
+	struct perf_event_ctx ctx = {
+		.complete_fn = tcpprobe_complete,
+	};
 	const char *tps[] = {
 		"tcp/tcp_probe",
 		NULL
@@ -304,5 +306,5 @@ int main(int argc, char **argv)
 	print_header();
 
 	/* main event loop */
-	return perf_event_loop(&ctx, NULL, NULL, tcpprobe_complete);
+	return perf_event_loop(&ctx);
 }
