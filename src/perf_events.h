@@ -25,6 +25,8 @@ struct perf_event_ctx {
 	int *pmu_fds;
 	struct perf_event_mmap_page **headers;
 	int num_cpus;
+
+	int data_size;
 	int page_size;
 	int page_cnt;  /* pages per mmap */
 	__u64 total_events;

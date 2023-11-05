@@ -459,6 +459,7 @@ int main(int argc, char **argv)
 		.event_timestamp = event_timestamp,
 		.process_event = process_event,
 		.complete_fn = pktlat_process_events,
+		.data_size = sizeof(struct data),
 	};
 	char *objfile = "pktlatency.o";
 	const char *tps[] = {

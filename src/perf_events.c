@@ -34,9 +34,7 @@ struct event {
 	struct rb_node rb_node;
 	struct list_head list;
 	__u64 time;
-	struct data data;      /* this struct varies by command;
-				* must contain time and cpu
-				*/
+	__u8 data[];
 };
 
 static struct rb_root events;
@@ -137,14 +135,14 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 	struct data *data = _data;
 	struct event *event;
 
-	if (size < sizeof(*data)) {
+	if (size < ctx->data_size) {
 		fprintf(stderr,
-			"Event size %d is less than data size %ld\n",
-			size, sizeof(*data));
+			"Event size %d is less than data size %d\n",
+			size, ctx->data_size);
 		return LIBBPF_PERF_EVENT_ERROR;
 	}
 
-	event = malloc(sizeof(*event));
+	event = malloc(sizeof(*event) + ctx->data_size);
 	if (!event) {
 		fprintf(stderr, "Failed to allocate memory for event\n");
 		return LIBBPF_PERF_EVENT_ERROR;
@@ -152,7 +150,7 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 	INIT_LIST_HEAD(&event->list);
 
 	event->time = ctx->event_timestamp(ctx, data);
-	memcpy(&event->data, data, sizeof(event->data));
+	memcpy(&event->data, data, ctx->data_size);
 	insert_event(ctx, event);
 	ctx->total_events++;
 

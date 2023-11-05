@@ -168,6 +168,7 @@ int main(int argc, char **argv)
 		.event_timestamp = event_timestamp,
 		.process_event = process_event,
 		.complete_fn = opensnoop_complete,
+		.data_size = sizeof(struct data),
 	};
 	char *objfile = "opensnoop.o";
 	bool filename_set = false;

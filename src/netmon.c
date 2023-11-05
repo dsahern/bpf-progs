@@ -1014,6 +1014,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	struct perf_event_ctx ctx = {
 		.output_fn = handle_bpf_output,
 		.complete_fn = pktdrop_complete,
+		.data_size = sizeof(struct data),
 	};
 	char *objfile = "pktdrop.o";
 	bool filename_set = false;

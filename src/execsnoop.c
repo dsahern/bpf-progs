@@ -267,7 +267,8 @@ int main(int argc, char **argv)
 	struct perf_event_ctx ctx = {
 		.event_timestamp = event_timestamp,
 		.process_event = process_event,
-		.complete_fn = execsnoop_complete
+		.complete_fn = execsnoop_complete,
+		.data_size = sizeof(struct data),
 	};
 	char *objfile = "execsnoop.o";
 	bool filename_set = false;
