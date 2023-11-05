@@ -27,12 +27,6 @@
 
 #include "kprobes.c"
 
-static int numcpus;
-static int page_size;
-static int page_cnt = 256;  /* pages per mmap */
-static __u64 total_events;
-static __u64 time_drops;
-
 /* users of the generic caching API are expected to implement
  * process_event.
  */
@@ -59,7 +53,7 @@ static void remove_event(struct event *event)
 	free(event);
 }
 
-static void insert_event(struct event *e_new)
+static void insert_event(struct perf_event_ctx *ctx, struct event *e_new)
 {
 	struct rb_root *root = &events;
 	struct rb_node **node = &root->rb_node;
@@ -76,7 +70,7 @@ static void insert_event(struct event *e_new)
 			node = &(*node)->rb_right;
 		else {
 			free(e_new);
-			time_drops++;
+			ctx->time_drops++;
 			return;
 		}
 	}
@@ -150,9 +144,9 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 	struct data *data = _data;
 	struct event *event;
 
-	if (numcpus && data->cpu >= numcpus) {
+	if (ctx->numcpus && data->cpu >= ctx->numcpus) {
 		fprintf(stderr, "CPU in event (%d) is > numcpus (%d)\n",
-			data->cpu, numcpus);
+			data->cpu, ctx->numcpus);
 		return LIBBPF_PERF_EVENT_ERROR;
 	}
 
@@ -171,8 +165,8 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 	INIT_LIST_HEAD(&event->list);
 
 	memcpy(&event->data, data, sizeof(event->data));
-	insert_event(event);
-	total_events++;
+	insert_event(ctx, event);
+	ctx->total_events++;
 
 	return LIBBPF_PERF_EVENT_CONT;
 }
@@ -186,13 +180,14 @@ int sys_perf_event_open(struct perf_event_attr *attr,
 	return syscall(__NR_perf_event_open, attr, pid, cpu, group_fd, flags);
 }
 
-static int perf_event_mmap_header(int fd, struct perf_event_mmap_page **header)
+static int perf_event_mmap_header(struct perf_event_ctx *ctx, int fd,
+				  struct perf_event_mmap_page **header)
 {
 	void *base;
 	int mmap_size;
 
-	page_size = getpagesize();
-	mmap_size = page_size * (page_cnt + 1);
+	ctx->page_size = getpagesize();
+	mmap_size = ctx->page_size * (ctx->page_cnt + 1);
 
 	base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (base == MAP_FAILED) {
@@ -236,21 +231,23 @@ bpf_perf_event_print(struct perf_event_header *hdr, void *private_data)
 	return LIBBPF_PERF_EVENT_CONT;
 }
 
-static int perf_event_poller_multi(int *fds,
+static int perf_event_poller_multi(struct perf_event_ctx *ctx,
+				   int *fds,
 				   int num_fds, perf_event_fn_t output_fn,
 				   void (*round_start_fn)(void),
 				   int (*round_complete_fn)(void))
 {
 	enum bpf_perf_event_ret ret = LIBBPF_PERF_EVENT_DONE;
-	struct perf_event_ctx ctx = { .fn = output_fn };
+	int page_size = ctx->page_size;
+	int page_cnt = ctx->page_cnt;
 	struct pollfd *pfds;
 	int timeout = 1000;
 	void *buf = NULL;
 	size_t len = 0;
 	int i;
 
-	if (!output_fn)
-		ctx.fn = __handle_bpf_output;
+	if (!output_fn || !ctx->fn)
+		ctx->fn = __handle_bpf_output;
 
 	pfds = calloc(num_fds, sizeof(*pfds));
 	if (!pfds)
@@ -272,7 +269,7 @@ static int perf_event_poller_multi(int *fds,
 							 page_cnt * page_size,
 							 page_size, &buf, &len,
 							 bpf_perf_event_print,
-							 &ctx);
+							 ctx);
 			if (ret != LIBBPF_PERF_EVENT_CONT)
 				break;
 		}
@@ -316,14 +313,20 @@ static int perf_event_output(int map_fd, int ncpus, int nevents)
 	return 0;
 }
 
-int perf_event_configure(struct bpf_object *obj, int nevents)
+int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
+			 int nevents)
 {
 	struct bpf_map *map;
 	int map_fd, i;
 
-	numcpus = get_nprocs();
-	if (numcpus > MAX_CPUS)
-		numcpus = MAX_CPUS;
+	ctx->numcpus = get_nprocs() ? : MAX_CPUS;
+	if (ctx->numcpus > MAX_CPUS)
+		ctx->numcpus = MAX_CPUS;
+
+	ctx->page_size = getpagesize();
+
+	if (!ctx->page_cnt)
+		ctx->page_cnt = 256;  /* pages per mmap */
 
 	map = bpf_object__find_map_by_name(obj, "channel");
 	if (!map) {
@@ -333,25 +336,25 @@ int perf_event_configure(struct bpf_object *obj, int nevents)
 
 	map_fd = bpf_map__fd(map);
 
-	if (perf_event_output(map_fd, numcpus, nevents))
+	if (perf_event_output(map_fd, ctx->numcpus, nevents))
 		return 1;
 
-	for (i = 0; i < numcpus; i++) {
-		if (perf_event_mmap_header(pmu_fds[i], &headers[i]) < 0)
+	for (i = 0; i < ctx->numcpus; i++) {
+		if (perf_event_mmap_header(ctx, pmu_fds[i], &headers[i]) < 0)
 			return 1;
 	}
 
 	return 0;
 }
 
-void close_perf_event_channel(void)
+void perf_event_close(struct perf_event_ctx *ctx)
 {
 	int i;
 
-	printf("total events: %llu\n", total_events);
-	printf("drops due to time collision: %llu\n", time_drops);
+	printf("total events: %llu\n", ctx->total_events);
+	printf("drops due to time collision: %llu\n", ctx->time_drops);
 
-	for (i = 0; i < numcpus; i++) {
+	for (i = 0; i < ctx->numcpus; i++) {
 		ioctl(pmu_fds[i], PERF_EVENT_IOC_DISABLE, 0);
 		close(pmu_fds[i]);
 	}
@@ -517,21 +520,18 @@ int perf_event_syscall(int prog_fd, const char *name)
 	return perf_event_tp_set_prog(prog_fd, id);
 }
 
-void perf_set_page_cnt(int cnt)
-{
-	page_cnt = cnt;
-}
-
-int perf_event_loop(perf_event_fn_t output_fn,
+int perf_event_loop(struct perf_event_ctx *ctx,
+		    perf_event_fn_t output_fn,
 		    void (*start_fn)(void), int (*complete_fn)(void))
 {
-	return perf_event_poller_multi(pmu_fds, numcpus,
+	return perf_event_poller_multi(ctx, pmu_fds, ctx->numcpus,
 				       output_fn, start_fn, complete_fn);
 }
 
-int perf_event_loop_cpu(perf_event_fn_t output_fn,
+int perf_event_loop_cpu(struct perf_event_ctx *ctx,
+			perf_event_fn_t output_fn,
 			 void (*start_fn)(void), int (*complete_fn)(void))
 {
-	return perf_event_poller_multi(pmu_fds, 1,
+	return perf_event_poller_multi(ctx, pmu_fds, 1,
                                        output_fn, start_fn, complete_fn);
 }

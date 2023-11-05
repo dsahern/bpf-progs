@@ -1016,6 +1016,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = { };
 	const char *kallsyms = "/proc/kallsyms";
+	struct perf_event_ctx ctx = {};
 	char *objfile = "pktdrop.o";
 	bool filename_set = false;
 	struct kprobe_data probes[] = {
@@ -1091,8 +1092,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		}
 	}
 
-	if (pg_cnt)
-		perf_set_page_cnt(pg_cnt);
+	ctx.page_cnt = pg_cnt;
 
 	if (set_reftime())
 		return 1;
@@ -1129,16 +1129,16 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		break;
 	}
 
-	if (perf_event_configure(obj, nevents))
+	if (perf_event_configure(&ctx, obj, nevents))
 		goto out;
 
 	if (do_hist)
 		alarm(display_rate);
 
 	/* main event loop */
-	rc = perf_event_loop(handle_bpf_output, NULL, pktdrop_complete);
+	rc = perf_event_loop(&ctx, handle_bpf_output, NULL, pktdrop_complete);
 out:
-	close_perf_event_channel();
+	perf_event_close(&ctx);
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));
 	return rc;
 }

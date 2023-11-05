@@ -256,6 +256,7 @@ int main(int argc, char **argv)
 		"sched/sched_process_exit",
 		NULL
 	};
+	struct perf_event_ctx ctx = {};
 	char *objfile = "execsnoop.o";
 	bool filename_set = false;
 	bool use_kprobe = true;
@@ -327,15 +328,15 @@ int main(int argc, char **argv)
 	if (do_tracepoint(obj, tps))
 		goto out;
 
-	if (perf_event_configure(obj, nevents))
+	if (perf_event_configure(&ctx, obj, nevents))
 		goto out;
 
 	print_header();
 
 	/* main event loop */
-	rc = perf_event_loop(NULL, NULL, execsnoop_complete);
+	rc = perf_event_loop(&ctx, NULL, NULL, execsnoop_complete);
 out:
-	close_perf_event_channel();
+	perf_event_close(&ctx);
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));
 
 	return rc;

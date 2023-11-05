@@ -156,6 +156,7 @@ int main(int argc, char **argv)
 	struct bpf_prog_load_attr prog_load_attr = {
 		.prog_type	= BPF_PROG_TYPE_KPROBE,
 	};
+	struct perf_event_ctx ctx = {};
 	char *objfile = "opensnoop.o";
 	bool filename_set = false;
 	struct kprobe_data probes[] = {
@@ -192,13 +193,13 @@ int main(int argc, char **argv)
 	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 		goto out;
 
-	if (perf_event_configure(obj, nevents))
+	if (perf_event_configure(&ctx, obj, nevents))
 		goto out;
 
 	/* main event loop */
-	rc = perf_event_loop(NULL, NULL, opensnoop_complete);
+	rc = perf_event_loop(&ctx, NULL, NULL, opensnoop_complete);
 out:
-	close_perf_event_channel();
+	perf_event_close(&ctx);
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));
 
 	return rc;

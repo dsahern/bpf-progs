@@ -447,6 +447,7 @@ static void print_usage(char *prog)
 int main(int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = { };
+	struct perf_event_ctx ctx = {};
 	char *objfile = "pktlatency.o";
 	const char *tps[] = {
 		"skb/skb_copy_datagram_iovec",
@@ -539,9 +540,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (perf_event_configure(obj, nevents))
+	if (perf_event_configure(&ctx, obj, nevents))
 		return 1;
 
 	/* main event loop */
-	return perf_event_loop(NULL, NULL, pktlat_process_events);
+	return perf_event_loop(&ctx, NULL, NULL, pktlat_process_events);
 }

@@ -239,6 +239,7 @@ int main(int argc, char **argv)
 {
 	char *objfile = "tcp_probe.o";
 	struct bpf_prog_load_attr prog_load_attr = { };
+	struct perf_event_ctx ctx = {};
 	const char *tps[] = {
 		"tcp/tcp_probe",
 		NULL
@@ -297,11 +298,11 @@ int main(int argc, char **argv)
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	if (perf_event_configure(obj, nevents))
+	if (perf_event_configure(&ctx, obj, nevents))
 		return 1;
 
 	print_header();
 
 	/* main event loop */
-	return perf_event_loop(NULL, NULL, tcpprobe_complete);
+	return perf_event_loop(&ctx, NULL, NULL, tcpprobe_complete);
 }
