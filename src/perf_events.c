@@ -27,11 +27,6 @@
 
 #include "kprobes.c"
 
-/* users of the generic caching API are expected to implement
- * process_event.
- */
-static void process_event(struct data *data);
-
 /*
  * time sorted list of events
  */
@@ -76,11 +71,11 @@ static void insert_event(struct perf_event_ctx *ctx, struct event *e_new)
 	rb_insert_color(&e_new->rb_node, root);
 }
 
-static void __process_event(struct event *event)
+static void __process_event(struct perf_event_ctx *ctx, struct event *event)
 {
 	struct event *e, *tmp;
 
-	process_event(&event->data);
+	ctx->process_event(ctx, &event->data);
 
 	if (event->list.prev == event->list.next)
 		return;
@@ -88,7 +83,7 @@ static void __process_event(struct event *event)
 	list_for_each_entry_safe(e, tmp, &event->list, list) {
 		list_del(&e->list);
 
-		process_event(&e->data);
+		ctx->process_event(ctx, &e->data);
 		remove_event(e);
 	}
 }
@@ -128,7 +123,7 @@ void perf_event_process_events(struct perf_event_ctx *ctx)
 			break;
 
 		rb_erase(&event->rb_node, rb_root);
-		__process_event(event);
+		__process_event(ctx, event);
 		remove_event(event);
 	}
 }

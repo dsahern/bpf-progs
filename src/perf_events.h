@@ -15,6 +15,9 @@ struct perf_event_ctx {
 	enum bpf_perf_event_ret (*output_fn)(struct perf_event_ctx *ctx,
 					     void *data, int size);
 
+	/* users of cache API */
+	void (*process_event)(struct perf_event_ctx *ctx, void *data);
+
 	/* called at the end of a polling loop; non-0 terminates polling */
 	int (*complete_fn)(struct perf_event_ctx *ctx);
 

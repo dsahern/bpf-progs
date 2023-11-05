@@ -146,8 +146,9 @@ static void show_timestamps(__u64 start, __u64 end)
 
 static const char *event_names[EVENT_MAX] = { "start", "arg", "ret", "exit" };
 
-static void process_event(struct data *data)
+static void process_event(struct perf_event_ctx *ctx, void *_data)
 {
+	struct data *data = _data;
 	struct task *task;
 	int i;
 
@@ -257,6 +258,7 @@ int main(int argc, char **argv)
 		NULL
 	};
 	struct perf_event_ctx ctx = {
+		.process_event = process_event,
 		.complete_fn = execsnoop_complete
 	};
 	char *objfile = "execsnoop.o";

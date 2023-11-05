@@ -29,11 +29,6 @@ static bool done;
 
 #include "perf_events.c"
 
-static void process_event(struct data *data)
-{
-	/* nothing to do */
-}
-
 static void dump_buckets(__u64 *buckets, __u64 *prev_buckets)
 {
 	__u64 diff[8];

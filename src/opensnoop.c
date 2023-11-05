@@ -106,8 +106,9 @@ static void show_timestamps(__u64 start, __u64 end)
 
 bool show_header;
 
-static void process_event(struct data *data)
+static void process_event(struct perf_event_ctx *ctx, void *_data)
 {
+	struct data *data = _data;
 	struct task *task;
 
 	if (show_header) {
@@ -157,6 +158,7 @@ int main(int argc, char **argv)
 		.prog_type	= BPF_PROG_TYPE_KPROBE,
 	};
 	struct perf_event_ctx ctx = {
+		.process_event = process_event,
 		.complete_fn = opensnoop_complete,
 	};
 	char *objfile = "opensnoop.o";

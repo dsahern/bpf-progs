@@ -144,10 +144,11 @@ static void normalize_data(unsigned int *pval, char *units)
 	*pval = val;
 }
 
-static void process_event(struct data *data)
+static void process_event(struct perf_event_ctx *ctx, void *_data)
 {
 	unsigned int sndw, rcvw, snd_next = 0, snd_una = 0;
 	unsigned int snd_seq, una_seq;
+	struct data *data = _data;
 	struct socket *sk;
 	char snd_u, rcv_u;
 
@@ -240,6 +241,7 @@ int main(int argc, char **argv)
 	char *objfile = "tcp_probe.o";
 	struct bpf_prog_load_attr prog_load_attr = { };
 	struct perf_event_ctx ctx = {
+		.process_event = process_event,
 		.complete_fn = tcpprobe_complete,
 	};
 	const char *tps[] = {

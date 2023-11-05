@@ -30,11 +30,6 @@ struct data {
 
 bool done;
 
-static void process_event(struct data *data)
-{
-	/* nothing to do */
-}
-
 static int dump_map(int map_fd)
 {
 	__u64 *key, *prev_key = NULL, val, pid;
