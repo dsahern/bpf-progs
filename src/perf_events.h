@@ -16,6 +16,7 @@ struct perf_event_ctx {
 					     void *data, int size);
 
 	/* users of cache API */
+	__u64 (*event_timestamp)(struct perf_event_ctx *ctx, void *data);
 	void (*process_event)(struct perf_event_ctx *ctx, void *data);
 
 	/* called at the end of a polling loop; non-0 terminates polling */

@@ -262,6 +262,13 @@ static void hwtimestamp(__u64 hwtime, __u64 stime)
 	}
 }
 
+static __u64 event_timestamp(struct perf_event_ctx *ctx, void *_data)
+{
+	struct data *data = _data;
+
+	return data->time;
+}
+
 static void process_event(struct perf_event_ctx *ctx, void *_data)
 {
 	static unsigned char num_events;
@@ -449,6 +456,7 @@ int main(int argc, char **argv)
 {
 	struct bpf_prog_load_attr prog_load_attr = { };
 	struct perf_event_ctx ctx = {
+		.event_timestamp = event_timestamp,
 		.process_event = process_event,
 		.complete_fn = pktlat_process_events,
 	};

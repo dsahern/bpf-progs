@@ -33,6 +33,7 @@
 struct event {
 	struct rb_node rb_node;
 	struct list_head list;
+	__u64 time;
 	struct data data;      /* this struct varies by command;
 				* must contain time and cpu
 				*/
@@ -56,9 +57,9 @@ static void insert_event(struct perf_event_ctx *ctx, struct event *e_new)
 
 		parent = *node;
 		e = container_of(parent, struct event, rb_node);
-		if (e->data.time > e_new->data.time)
+		if (e->time > e_new->time)
 			node = &(*node)->rb_left;
-		else if (e->data.time < e_new->data.time)
+		else if (e->time < e_new->time)
 			node = &(*node)->rb_right;
 		else {
 			free(e_new);
@@ -119,7 +120,7 @@ void perf_event_process_events(struct perf_event_ctx *ctx)
 			break;
 
 		event = container_of(node, struct event, rb_node);
-		if (event->data.time >= end_time)
+		if (event->time >= end_time)
 			break;
 
 		rb_erase(&event->rb_node, rb_root);
@@ -136,12 +137,6 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 	struct data *data = _data;
 	struct event *event;
 
-	if (ctx->num_cpus && data->cpu >= ctx->num_cpus) {
-		fprintf(stderr, "CPU in event (%d) is > num_cpus (%d)\n",
-			data->cpu, ctx->num_cpus);
-		return LIBBPF_PERF_EVENT_ERROR;
-	}
-
 	if (size < sizeof(*data)) {
 		fprintf(stderr,
 			"Event size %d is less than data size %ld\n",
@@ -156,6 +151,7 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 	}
 	INIT_LIST_HEAD(&event->list);
 
+	event->time = ctx->event_timestamp(ctx, data);
 	memcpy(&event->data, data, sizeof(event->data));
 	insert_event(ctx, event);
 	ctx->total_events++;
