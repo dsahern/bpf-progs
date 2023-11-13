@@ -471,6 +471,46 @@ int configure_tracepoints(struct bpf_object *obj, const char *tps[])
 	return 0;
 }
 
+/* tps is a NULL terminated array of tracepoint names.
+ * bpf program is expected to be named tracepoint/%s
+ */
+int configure_raw_tracepoints(struct bpf_object *obj, const char *tps[])
+{
+        struct bpf_program *prog;
+        int prog_fd, fd;
+        int i;
+
+        for (i = 0; tps[i]; ++i) {
+		const char *tp;
+                char buf[256];
+
+		snprintf(buf, sizeof(buf), "raw_tracepoint/%s", tps[i]);
+
+		prog = bpf_object__find_program_by_title(obj, buf);
+		if (!prog) {
+			printf("Failed to get prog in obj file\n");
+			return 1;
+		}
+		prog_fd = bpf_program__fd(prog);
+
+		/* bpf_raw_tracepoint_open wants basename of tracepoint */
+		tp = strchr(tps[i], '/');
+		if (tp)
+			tp++;
+		else
+			tp = tps[i];
+		fd = bpf_raw_tracepoint_open(tp, prog_fd);
+		if (fd < 0) {
+			fprintf(stderr,
+				"Failed to create perf_event on raw tracepoint %s: %d %s\n",
+				tps[i], fd, strerror(errno));
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 /* modern way to do ebpf with kprobe - create the probe
  * with perf_event_open and attach program
  */
