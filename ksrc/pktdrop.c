@@ -36,6 +36,7 @@ int bpf_kfree_skb(struct kfree_skb_args *ctx)
 
 	data.location = (u64)ctx->location;
 	data.protocol = htons(ctx->protocol);
+	data.reason = htons(ctx->reason);
 
 	/* Try to find a net_device. Prefer skb->dev but it gets
 	 * dropped at the transport layer.

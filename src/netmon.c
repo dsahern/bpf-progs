@@ -870,13 +870,14 @@ static void show_packet(struct data *data, struct ksym_s *sym)
 	if (sym) {
 		__u64 offset = data->location - sym->addr;
 
-		printf("%s+0x%llx (%llx)\n",
+		printf("%s+0x%llx (%llx)",
 		       sym->name, offset, data->location);
 		is_unix = sym->is_unix;
 	} else {
-		printf("%llx\n", data->location);
+		printf("%llx", data->location);
 		is_unix = false;
 	}
+	printf("reason %u\n", data->reason);
 
 	len = data->pkt_len;
 	if (len > sizeof(data->pkt_data))

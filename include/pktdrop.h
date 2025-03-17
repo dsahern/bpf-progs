@@ -17,6 +17,7 @@ struct data {
 	__u8	pkt_type;
 	__u16	gso_size;
 	__be16	protocol;
+	__u32   reason;
 	__u32	ifindex;
 	__u16	vlan_tci;
 	__be16	vlan_proto;
@@ -38,6 +39,8 @@ struct kfree_skb_args {
 	void *skbaddr;
 	void *location;
 	unsigned short protocol;
+	unsigned short unused2;
+	unsigned int reason;
 };
 
 #endif
