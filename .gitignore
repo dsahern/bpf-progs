@@ -1,2 +1,5 @@
 obj/
+bin/
+cscope.*
+vmlinux.h
 config.mk
