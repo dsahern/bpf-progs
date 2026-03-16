@@ -98,8 +98,10 @@ int main(int argc, char **argv)
 	struct ovslat_hist_val hist2 = {};
 	char *objfile = "ovslatency.o";
 	struct kprobe_data probes[] = {
-		{ .func = "ovs_vport_receive", .fd = -1 },
-		{ .func = "ovs_vport_receive", .fd = -1, .retprobe = true },
+		{ .prog = "bpf_ovs_kprobe",     .func = "ovs_vport_receive",
+		  .fd = -1 },
+		{ .prog = "bpf_ovs_kprobe_ret", .func = "ovs_vport_receive",
+		  .fd = -1, .retprobe = true },
 	};
 	bool filename_set = false;
 	struct bpf_object *obj;

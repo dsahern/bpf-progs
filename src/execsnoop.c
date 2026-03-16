@@ -250,9 +250,9 @@ static void print_usage(char *prog)
 int main(int argc, char **argv)
 {
 	struct kprobe_data probes[] = {
-		{ .prog = "kprobe/execve",     .func = "__x64_sys_execve",
+		{ .prog = "bpf_sys_execve",     .func = "__x64_sys_execve",
 		  .fd = -1 },
-		{ .prog = "kprobe/execve_ret", .func = "__x64_sys_execve",
+		{ .prog = "bpf_sys_execve_ret", .func = "__x64_sys_execve",
 		  .fd = -1, .retprobe = true },
 	};
 	const char *bpf_fn_exec[] = {

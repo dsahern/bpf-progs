@@ -82,7 +82,7 @@ int main(int argc, char **argv)
 {
 	char *objfile = "kvm-nested.o";
 	struct kprobe_data probes[] = {
-		{ .func = "handle_vmresume", .fd = -1 },
+		{ .prog = "kp_nested_kvm", .func = "handle_vmresume", .fd = -1 },
 	};
 	const char *bpf_fn[] = {
 		"bpf_kvm_nested_exit",

@@ -1019,7 +1019,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	char *objfile = "pktdrop.o";
 	bool filename_set = false;
 	struct kprobe_data probes[] = {
-		{ .func = "fib_net_exit", .fd = -1 },
+		{ .prog = "bpf_fib_net_exit", .func = "fib_net_exit", .fd = -1 },
 	};
 	const char *bpf_fn[] = {
 		"bpf_kfree_skb",

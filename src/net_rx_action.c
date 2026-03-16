@@ -96,8 +96,8 @@ int main(int argc, char **argv)
 	struct net_rx_hist_val hist2 = {};
 	char *objfile = "net_rx_action.o";
 	struct kprobe_data probes[] = {
-		{ .func = "net_rx_action", .fd = -1 },
-		{ .func = "net_rx_action", .fd = -1, .retprobe = true },
+		{ .prog = "bpf_net_rx_kprobe",     .func = "net_rx_action", .fd = -1 },
+		{ .prog = "bpf_net_rx_kprobe_ret", .func = "net_rx_action", .fd = -1, .retprobe = true },
 	};
 	bool filename_set = false;
 	struct bpf_object *obj;

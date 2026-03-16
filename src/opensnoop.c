@@ -169,8 +169,8 @@ int main(int argc, char **argv)
 	char *objfile = "opensnoop.o";
 	bool filename_set = false;
 	struct kprobe_data probes[] = {
-		{ .func = "do_sys_open", .fd = -1 },
-		{ .func = "do_sys_open", .fd = -1, .retprobe = true },
+		{ .prog = "bpf_sys_open",     .func = "do_sys_open", .fd = -1 },
+		{ .prog = "bpf_sys_open_ret", .func = "do_sys_open", .fd = -1, .retprobe = true },
 	};
 	struct bpf_object *obj;
 	int nevents = 1000;

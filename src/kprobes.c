@@ -133,9 +133,7 @@ int kprobe_event_type(void)
 }
 
 /* probes is a NULL terminated array of function names to put
- * kprobe. bpf program is expected to be named kprobe/%s.
- * If retprobe is set, bpf program name is expected to be
- * "kprobe/%s_ret"
+ * kprobe.
  */
 int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
 		unsigned int count)
@@ -150,13 +148,7 @@ int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
 	for (i = 0; i < count; ++i) {
 		char buf[256];
 
-		if (probes[i].prog) {
-			snprintf(buf, sizeof(buf), "%s", probes[i].prog);
-		} else {
-			snprintf(buf, sizeof(buf), "kprobe/%s%s",
-				 probes[i].func,
-				 probes[i].retprobe ? "_ret" : "");
-		}
+		snprintf(buf, sizeof(buf), "%s", probes[i].prog);
 
 		prog = bpf_object__find_program_by_name(obj, buf);
 		if (!prog) {
