@@ -4,41 +4,39 @@
  *
  * Copyright (c) 2019-20 David Ahern <dsahern@gmail.com>
  */
-#define KBUILD_MODNAME "xdp_vmegress"
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/if_vlan.h>
+
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 
 #include "xdp_vlan.h"
-#include "acl_simple.h"
 
 /* TO-DO: pull this from a map */
 #define EGRESS_ETH0   2
 #define EGRESS_ETH1   3
 
 /* For TX-traffic redirect requires net_device ifindex to be in this devmap */
-struct bpf_map_def SEC("maps") __egress_ports = {
-	.type = BPF_MAP_TYPE_DEVMAP_HASH,
-	.key_size = sizeof(u32),
-	.value_size = sizeof(struct bpf_devmap_val),
-	.max_entries = 2,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_DEVMAP_HASH);
+	__uint(max_entries, 2);
+	__type(key, u32);
+	__type(value, struct bpf_devmap_val);
+} egress_ports SEC(".maps");
 
-struct bpf_map_def SEC("maps") __acl_map = {
-        .type = BPF_MAP_TYPE_HASH,
-        .key_size = sizeof(struct acl_key),
-        .value_size = sizeof(struct acl_val),
-        .max_entries = 64,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 64);
+	__type(key, struct acl_key);
+	__type(value, struct acl_val);
+} acl_map SEC(".maps");
 
-struct bpf_map_def SEC("maps") __vm_info_map = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(u32),
-	.value_size = sizeof(struct vm_info),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct vm_info);
+} vm_info_map SEC(".maps");
+
+#include "acl_simple.h"
 
 static __always_inline u32 bond_hash(struct flow *fl)
 {
@@ -77,11 +75,11 @@ int xdp_egress_prog(struct xdp_md *ctx)
 	u16 h_proto;
 	int rc;
 
-	vi = bpf_map_lookup_elem(&__vm_info_map, &idx);
+	vi = bpf_map_lookup_elem(&vm_info_map, &idx);
 	if (!vi)
 		return XDP_PASS;
 
-        if (drop_packet(data, data_end, vi, true, &fl, &__acl_map))
+        if (drop_packet(data, data_end, vi, true, &fl))
 		return XDP_DROP;
 
 	/* don't redirect broadcast frames */
@@ -93,7 +91,7 @@ int xdp_egress_prog(struct xdp_md *ctx)
 
 	idx = bond_hash(&fl);
 
-	return bpf_redirect_map(&__egress_ports, idx, 0);
+	return bpf_redirect_map(&egress_ports, idx, 0);
 }
 
 char _license[] SEC("license") = "GPL";

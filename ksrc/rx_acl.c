@@ -3,26 +3,19 @@
  *
  * Rx ACL
  */
-#define KBUILD_MODNAME "rx_acl"
-#include <linux/bpf.h>
-#include <linux/in.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/if_vlan.h>
-#include <linux/ip.h>
-#include <net/ip.h>
-#include <linux/ipv6.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 
 #include "xdp_acl.h"
-#include "acl_simple.h"
 
-struct bpf_map_def SEC("maps") rx_acl_map = {
-	.type = BPF_MAP_TYPE_HASH,
-	.key_size = sizeof(struct acl_key),
-	.value_size = sizeof(struct acl_val),
-	.max_entries = 64,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 64);
+	__type(key, struct acl_key);
+	__type(value, struct acl_val);
+} acl_map SEC(".maps");
+
+#include "acl_simple.h"
 
 SEC("classifier/rx_acl")
 int tc_acl_rx_prog(struct __sk_buff *skb)
@@ -33,7 +26,7 @@ int tc_acl_rx_prog(struct __sk_buff *skb)
 	struct flow fl = {};
 	bool rc;
 
-	rc = drop_packet(data, data_end, NULL, true, &fl, &rx_acl_map);
+	rc = drop_packet(data, data_end, NULL, true, &fl);
 
 	return rc ? TC_ACT_SHOT : TC_ACT_OK;
 }
@@ -46,7 +39,7 @@ int xdp_rx_acl_prog(struct xdp_md *ctx)
 	struct flow fl = {};
 	bool rc;
 
-	rc = drop_packet(data, data_end, NULL, true, &fl, &rx_acl_map);
+	rc = drop_packet(data, data_end, NULL, true, &fl);
 
 	return rc ? XDP_DROP : XDP_PASS;
 }

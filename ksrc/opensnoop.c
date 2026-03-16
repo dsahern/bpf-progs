@@ -5,18 +5,20 @@
  *
  * David Ahern <dsahern@gmail.com>
  */
-#define KBUILD_MODNAME "opensnoop"
-#include <linux/ptrace.h>
-#include <linux/bpf.h>
-#include <linux/sched.h>
-#include <linux/version.h>
+
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
 #include "opensnoop.h"
-
-#include "channel_map.c"
 #include "set_current_info.c"
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, MAX_CPUS);
+	__type(key, int);
+	__type(value, __u32);
+} channel SEC(".maps");
 
 SEC("kprobe/do_sys_open")
 int bpf_sys_open(struct pt_regs *ctx)
@@ -61,4 +63,3 @@ int bpf_sys_open_ret(struct pt_regs *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

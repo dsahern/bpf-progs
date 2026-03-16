@@ -1,14 +1,16 @@
-#define KBUILD_MODNAME "tcp_probe"
-#include <linux/bpf.h>
-#include <linux/in.h>
-#include <linux/in6.h>
-#include <linux/socket.h>
-#include <linux/version.h>
+
+#include "vmlinux.h"
+
 #include <bpf/bpf_helpers.h>
 
 #include "tcp_probe.h"
 
-#include "channel_map.c"
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, MAX_CPUS);
+	__type(key, int);
+	__type(value, __u32);
+} channel SEC(".maps");
 
 SEC("tracepoint/tcp/tcp_probe")
 int bpf_tcp_probe(struct tcp_probe_args *ctx)
@@ -43,4 +45,3 @@ int bpf_tcp_probe(struct tcp_probe_args *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

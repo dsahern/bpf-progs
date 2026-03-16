@@ -4,23 +4,19 @@
  * Copyright (c) 2020 David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "napi_poll"
-#include <linux/bpf.h>
-#include <linux/ptrace.h>
-#include <linux/version.h>
+#include "vmlinux.h"
+
 #include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
 
 #include "napi_poll.h"
-
 #include "bpf_debug.h"
 
-struct bpf_map_def SEC("maps") napi_poll_map = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(u32),
-	.value_size = sizeof(struct napi_poll_hist),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct napi_poll_hist);
+} napi_poll_map SEC(".maps");
 
 SEC("tracepoint/napi/napi_poll")
 int bpf_napi_poll(struct napi_poll_args *ctx)
@@ -63,4 +59,3 @@ int bpf_napi_poll(struct napi_poll_args *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

@@ -14,30 +14,31 @@
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "pktlatency"
-#include <linux/bpf.h>
-#include <linux/version.h>
-#include <linux/netdevice.h>
-#include <linux/skbuff.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 
 #include "pktlatency.h"
 
-#include "channel_map.c"
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, MAX_CPUS);
+	__type(key, int);
+	__type(value, __u32);
+} channel SEC(".maps");
 
-struct bpf_map_def SEC("maps") pktlat_map = {
-	.type = BPF_MAP_TYPE_HASH,  // BPF_MAP_TYPE_PERCPU_HASH
-	.key_size = sizeof(struct pktlat_hist_key),
-	.value_size = sizeof(struct pktlat_hist_val),
-	.max_entries = 512,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 512);
+	__type(key, struct pktlat_hist_key);
+	__type(value, struct pktlat_hist_val);
+} pktlat_map SEC(".maps");
 
-struct bpf_map_def SEC("maps") pktlat_ctl_map = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(u32),
-	.value_size = sizeof(struct pktlat_ctl),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct pktlat_ctl);
+} pktlat_ctl_map SEC(".maps");
 
 static __always_inline int update_stats(struct pktlat_hist_val *hist,
 					struct pktlat_ctl *ctl,
@@ -90,7 +91,7 @@ static __always_inline void gen_sample(struct skb_dg_iov_args *ctx,
 {
 	struct data data;
 
-	memset(&data, 0, sizeof(data));
+	__builtin_memset(&data, 0, sizeof(data));
 
 	data.event_type = EVENT_SAMPLE;
 	data.time = bpf_ktime_get_ns();
@@ -178,7 +179,7 @@ int bpf_skb_dg_iov(struct skb_dg_iov_args *ctx)
 	} else {
 		struct pktlat_hist_val hist2;
 
-		memset(&hist2, 0, sizeof(hist2));
+		__builtin_memset(&hist2, 0, sizeof(hist2));
 		if (update_stats(&hist2, ctl, tstamp))
 			with_skb_data = true;
 		bpf_map_update_elem(&pktlat_map, &hkey, &hist2, BPF_ANY);
@@ -204,7 +205,7 @@ int bpf_sched_exit(struct sched_exit_args *ctx)
 
 	bpf_map_delete_elem(&pktlat_map, &hkey);
 
-	memset(&data, 0, sizeof(data));
+	__builtin_memset(&data, 0, sizeof(data));
 	data.event_type = EVENT_EXIT,
 	data.time = bpf_ktime_get_ns();
 	data.pid = ctx->pid;
@@ -218,4 +219,3 @@ int bpf_sched_exit(struct sched_exit_args *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

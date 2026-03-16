@@ -1,8 +1,6 @@
 #ifndef __VM_INFO_H_
 #define __VM_INFO_H_
 
-#include <linux/if_ether.h>
-
 struct vm_info
 {
 	__u32		vmid;

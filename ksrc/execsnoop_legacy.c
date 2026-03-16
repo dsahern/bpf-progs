@@ -5,19 +5,20 @@
  * David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "execsnoop"
-#include <linux/ptrace.h>  /* pt_regs via asm/ptrace.h */
-#include <linux/bpf.h>
-#include <linux/sched.h>
-#include <linux/fs.h>
-#include <linux/version.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 
 #include "execsnoop.h"
 #include "sched_tp.h"
 
-#include "channel_map.c"
 #include "set_current_info.c"
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, MAX_CPUS);
+	__type(key, int);
+	__type(value, __u32);
+} channel SEC(".maps");
 
 /* expecting args to be filename, argv, envp */
 SEC("kprobe/execve")
@@ -36,7 +37,7 @@ int bpf_sys_execve(struct pt_regs *ctx)
 	set_current_info(&data);
 
 	if (bpf_probe_read_str(data.arg, sizeof(data.arg), filename) < 0) {
-		strcpy(data.arg, "<filename FAILED>");
+		__builtin_strcpy(data.arg, "<filename FAILED>");
 		bail = true;
 	}
 
@@ -60,7 +61,7 @@ int bpf_sys_execve(struct pt_regs *ctx)
 			goto out;
 	}
 
-	strcpy(data.arg, "...");
+	__builtin_strcpy(data.arg, "...");
 	bpf_perf_event_output(ctx, &channel, BPF_F_CURRENT_CPU,
 			      &data, sizeof(data));
 out:
@@ -94,7 +95,7 @@ int bpf_sched_exit(struct sched_exit_args *ctx)
 		.event_type = EVENT_EXIT,
 	};
 
-	memcpy(data.comm, ctx->comm, 15);
+	__builtin_memcpy(data.comm, ctx->comm, 15);
 	data.pid = ctx->pid;
 
 	if (bpf_perf_event_output(ctx, &channel, BPF_F_CURRENT_CPU,
@@ -105,4 +106,3 @@ int bpf_sched_exit(struct sched_exit_args *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

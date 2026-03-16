@@ -4,23 +4,18 @@
  * Copyright (c) 2020 David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "xdp_devmap_xmit"
-#include <linux/bpf.h>
-#include <linux/ptrace.h>
-#include <linux/version.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
 
 #include "xdp_devmap_xmit.h"
-
 #include "bpf_debug.h"
 
-struct bpf_map_def SEC("maps") devmap_xmit_map = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(u32),
-	.value_size = sizeof(struct devmap_xmit_hist),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct devmap_xmit_hist);
+} devmap_xmit_map SEC(".maps");
 
 SEC("tracepoint/xdp/xdp_devmap_xmit")
 int bpf_devmap_xmit(struct devmap_xmit_args *ctx)
@@ -61,4 +56,3 @@ int bpf_devmap_xmit(struct devmap_xmit_args *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

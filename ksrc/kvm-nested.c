@@ -3,17 +3,16 @@
  * David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "kvm_nested"
-#include <linux/bpf.h>
-#include <linux/version.h>
+#include "vmlinux.h"
+
 #include <bpf/bpf_helpers.h>
 
-struct bpf_map_def SEC("maps") nested_virt_map = {
-        .type = BPF_MAP_TYPE_HASH,
-        .key_size = sizeof(u64),
-        .value_size = sizeof(u64),
-        .max_entries = 512,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 512);
+	__type(key, u64);
+	__type(value, u64);
+} nested_virt_map SEC(".maps");
 
 static __always_inline void do_nested_kvm(void)
 {
@@ -31,7 +30,7 @@ static __always_inline void do_nested_kvm(void)
 }
 
 SEC("tracepoint/kvm/kvm_nested_vmexit")
-int tp_nested_kvm(void *ctx)
+int bpf_kvm_nested_exit(void *ctx)
 {
 	do_nested_kvm();
 	return 0;
@@ -58,4 +57,3 @@ int bpf_sched_exit(void *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

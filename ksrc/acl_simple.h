@@ -4,24 +4,17 @@
  * Implement simple address / protocol / port ACL for a
  * VM, but implemented in a host.
  */
-#include <linux/bpf.h>
-#include <linux/in.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/if_vlan.h>
-#include <linux/ip.h>
-#include <net/ip.h>
-#include <linux/ipv6.h>
-#include <bpf/bpf_helpers.h>
-
+#include "net_defines.h"
 #include "xdp_acl.h"
 #include "vm_info.h"
 #include "eth_helpers.h"
 #include "ipv6_helpers.h"
 #include "flow.h"
 
+/* expects a bpf map named acl_map */
+
 static __always_inline bool acl_simple(struct ethhdr *eth, struct flow *fl,
-				      bool use_src, struct bpf_map_def *acl_map)
+				      bool use_src)
 {
 	struct acl_key key = {};
 	struct acl_val *val;
@@ -30,12 +23,12 @@ static __always_inline bool acl_simple(struct ethhdr *eth, struct flow *fl,
 	if (key.protocol == IPPROTO_TCP || key.protocol == IPPROTO_UDP)
 		key.port = fl->ports.dport;
 
-	val = bpf_map_lookup_elem(acl_map, &key);
+	val = bpf_map_lookup_elem(&acl_map, &key);
 	/* if no entry, pass */
 	if (!val) {
                 /* check for just protocol; maybe a sport ACL */
 		key.port = 0;
-		val = bpf_map_lookup_elem(acl_map, &key);
+		val = bpf_map_lookup_elem(&acl_map, &key);
 	}
 	if (!val)
 		return false;
@@ -83,14 +76,13 @@ static __always_inline bool acl_simple(struct ethhdr *eth, struct flow *fl,
 /* returns true if packet should be dropped; false to continue */
 static __always_inline bool drop_packet(void *data, void *data_end,
 					struct vm_info *vi, bool rx,
-					struct flow *fl,
-					struct bpf_map_def *acl_map)
+					struct flow *fl)
 {
 	struct ethhdr *eth = data;
 	bool rc = false;
 	int ret;
 
-	if (eth + 1 > data_end)
+	if ((void *)(eth + 1) > data_end)
 		return true;
 
 	/* direction: Tx = to VM, Rx = from VM */
@@ -104,8 +96,5 @@ static __always_inline bool drop_packet(void *data, void *data_end,
 	/* Rx = from VM: check dest address against ACL
 	 * Tx = to VM: check source address against ACL
 	 */
-	if (acl_map)
-		rc = acl_simple(eth, fl, !rx, acl_map);
-
-	return rc;
+	return acl_simple(eth, fl, !rx);
 }

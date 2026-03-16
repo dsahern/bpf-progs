@@ -4,19 +4,20 @@
  * David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "execsnoop"
-#include <linux/ptrace.h>  /* pt_regs via asm/ptrace.h */
-#include <linux/bpf.h>
-#include <linux/sched.h>
-#include <linux/fs.h>
-#include <linux/version.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 
 #include "execsnoop.h"
 #include "sched_tp.h"
 
-#include "channel_map.c"
 #include "set_current_info.c"
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, MAX_CPUS);
+	__type(key, int);
+	__type(value, __u32);
+} channel SEC(".maps");
 
 /* expecting args to be filename, argv, envp */
 SEC("kprobe/execve")
@@ -173,4 +174,3 @@ int bpf_sched_exit(struct sched_exit_args *ctx)
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

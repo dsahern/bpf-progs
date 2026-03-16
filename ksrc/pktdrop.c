@@ -5,18 +5,24 @@
  *
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
-#define KBUILD_MODNAME "pktdrop"
-#include <linux/bpf.h>
-#include <linux/version.h>
-#include <linux/netdevice.h>
-#include <linux/skbuff.h>
-#include <net/dst.h>
-#include <net/net_namespace.h>
+#include "vmlinux.h"
+
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_tracing.h>
+#include <bpf/bpf_endian.h>
 
 #include "pktdrop.h"
 
-#include "channel_map.c"
+/* from skbuff.h */
+#define SKB_DST_NOREF   1UL
+#define SKB_DST_PTRMASK ~(SKB_DST_NOREF)
+
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, MAX_CPUS);
+	__type(key, int);
+	__type(value, __u32);
+} channel SEC(".maps");
 
 SEC("tracepoint/skb/kfree_skb")
 int bpf_kfree_skb(struct kfree_skb_args *ctx)
@@ -35,8 +41,8 @@ int bpf_kfree_skb(struct kfree_skb_args *ctx)
 	u8 pkt_type;
 
 	data.location = (u64)ctx->location;
-	data.protocol = htons(ctx->protocol);
-	data.reason = htons(ctx->reason);
+	data.protocol = bpf_htons(ctx->protocol);
+	data.reason = bpf_htons(ctx->reason);
 
 	/* Try to find a net_device. Prefer skb->dev but it gets
 	 * dropped at the transport layer.
@@ -127,5 +133,4 @@ int bpf_fib_net_exit(struct pt_regs *ctx)
 	return 0;
 }
 
-char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;
+char LICENSE[] SEC("license") = "GPL";

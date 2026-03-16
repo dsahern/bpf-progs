@@ -1,15 +1,12 @@
 #ifndef __XDP_VLAN_H
 #define __XDP_VLAN_H
 
+#include <bpf/bpf_endian.h>
+#include "net_defines.h"
+
 /*
  * helpers for pushing/popping vlan for xdp context
  */
-
-#include <linux/bpf.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/if_vlan.h>
-#include <bpf/bpf_helpers.h>
 
 static __always_inline int xdp_vlan_push(struct xdp_md *ctx, __be16 vlan)
 {
@@ -22,7 +19,7 @@ static __always_inline int xdp_vlan_push(struct xdp_md *ctx, __be16 vlan)
 	u16 h_proto;
 	int rc;
 
-	if (eth + 1 > data_end)
+	if ((void *)(eth + 1) > data_end)
 		return -1;
 
 	h_proto = eth->h_proto;
@@ -36,7 +33,7 @@ static __always_inline int xdp_vlan_push(struct xdp_md *ctx, __be16 vlan)
 	data_end = (void *)(long)ctx->data_end;
 	eth = data;
 	vhdr = data + sizeof(*eth);
-	if (vhdr + 1 > data_end)
+	if ((void *)(vhdr + 1) > data_end)
 		return -1;
 
 	vhdr->h_vlan_TCI = vlan;
@@ -44,7 +41,7 @@ static __always_inline int xdp_vlan_push(struct xdp_md *ctx, __be16 vlan)
 
 	__builtin_memcpy(eth->h_dest, dmac, ETH_ALEN);
 	__builtin_memcpy(eth->h_source, smac, ETH_ALEN);
-	eth->h_proto = htons(ETH_P_8021Q);
+	eth->h_proto = bpf_htons(ETH_P_8021Q);
 
 	return 0;
 }
@@ -63,15 +60,15 @@ static __always_inline int xdp_vlan_pop(struct xdp_md *ctx, __be16 vlan)
 	u16 h_proto;
 	int rc;
 
-	if (eth + 1 > data_end)
+	if ((void *)(eth + 1) > data_end)
 		return -1;
 
 	/* expecting a specific vlan tag */
-	if (eth->h_proto != htons(ETH_P_8021Q))
+	if (eth->h_proto != bpf_htons(ETH_P_8021Q))
 		return 1;
 
 	vhdr = data + sizeof(*eth);
-	if (vhdr + 1 > data_end)
+	if ((void *)(vhdr + 1) > data_end)
 		return -1;
 
 	if (vhdr->h_vlan_TCI != vlan)
@@ -88,7 +85,7 @@ static __always_inline int xdp_vlan_pop(struct xdp_md *ctx, __be16 vlan)
 	data = (void *)(long)ctx->data;
 	data_end = (void *)(long)ctx->data_end;
 	eth = data;
-	if (eth + 1 > data_end)
+	if ((void *)(eth + 1) > data_end)
 		return -1;
 
 	__builtin_memcpy(eth->h_dest, dmac, ETH_ALEN);

@@ -5,16 +5,9 @@
  *
  * Packet parser
  */
-#include <linux/bpf.h>
-#include <linux/in.h>
-#include <linux/if_ether.h>
-#include <linux/if_packet.h>
-#include <linux/if_vlan.h>
-#include <linux/icmp.h>
-#include <linux/icmpv6.h>
-#include <linux/ip.h>
-#include <linux/ipv6.h>
-#include <net/ip.h>
+
+#include <bpf/bpf_endian.h>
+#include "net_defines.h"
 
 #define ENABLE_FLOW_IPV6
 
@@ -71,7 +64,7 @@ static __always_inline int parse_icmp6(struct flow *fl, void *nh,
 {
 	struct icmp6hdr *icmph = nh;
 
-	if (icmph + 1 > data_end)
+	if ((void *)(icmph + 1) > data_end)
 		return -1;
 
 	fl->icmp.type = icmph->icmp6_type;
@@ -80,7 +73,7 @@ static __always_inline int parse_icmp6(struct flow *fl, void *nh,
 	switch (icmph->icmp6_type) {
 	case ICMPV6_ECHO_REQUEST:
 	case ICMPV6_ECHO_REPLY:
-		fl->icmp.id = icmph->icmp6_identifier ? : 1;
+		fl->icmp.id = icmph->icmp6_dataun.u_echo.identifier ? : 1;
 		break;
 	}
 
@@ -93,7 +86,7 @@ static __always_inline int parse_icmp(struct flow *fl, void *nh,
 {
 	struct icmphdr *icmph = nh;
 
-	if (icmph + 1 > data_end)
+	if ((void *)(icmph + 1) > data_end)
 		return -1;
 
 	fl->icmp.type = icmph->type;
@@ -116,7 +109,7 @@ static __always_inline int parse_udp(struct flow *fl, void *nh,
 {
 	struct udphdr *uhdr = nh;
 
-	if (uhdr + 1 > data_end)
+	if ((void *)(uhdr + 1) > data_end)
 		return -1;
 
 	fl->ports.sport = uhdr->source;
@@ -130,7 +123,7 @@ static __always_inline int parse_tcp(struct flow *fl, void *nh,
 {
 	struct tcphdr *thdr = nh;
 
-	if (thdr + 1 > data_end)
+	if ((void *)(thdr + 1) > data_end)
 		return -1;
 
 	fl->ports.sport = thdr->source;
@@ -166,7 +159,7 @@ static __always_inline int parse_v6(struct flow *fl, void *nh, void *data_end,
 {
 	struct ipv6hdr *ip6h = nh;
 
-	if (ip6h + 1 > data_end)
+	if ((void *)(ip6h + 1) > data_end)
 		return -1;
 
 	if (ip6h->version != 6)
@@ -190,7 +183,7 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end,
 {
 	struct iphdr *iph = nh;
 
-	if (iph + 1 > data_end)
+	if ((void *)(iph + 1) > data_end)
 		return -1;
 
 	if (iph->version != 4 || iph->ihl < 5)
@@ -202,7 +195,7 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end,
 	fl->protocol = iph->protocol;
 
 	/* fragments won't have the transport header */
-	if (ntohs(iph->frag_off) & (IP_MF | IP_OFFSET)) {
+	if (bpf_ntohs(iph->frag_off) & (IP_MF | IP_OFFSET)) {
 		fl->fragment = 1;
 		return 0;
 	}
@@ -215,7 +208,7 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end,
 	if (fl->protocol == IPPROTO_IPIP) {
 		iph = nh;
 
-		if (iph + 1 > data_end)
+		if ((void *)(iph + 1) > data_end)
 			return -1;
 
 		if (iph->version != 4 || iph->ihl < 5)
@@ -224,7 +217,7 @@ static __always_inline int parse_v4(struct flow *fl, void *nh, void *data_end,
 		fl->inner_saddr = iph->saddr;
 		fl->inner_daddr = iph->daddr;
 		fl->inner_protocol = iph->protocol;
-		if (ntohs(iph->frag_off) & (IP_MF | IP_OFFSET)) {
+		if (bpf_ntohs(iph->frag_off) & (IP_MF | IP_OFFSET)) {
 			fl->fragment = 1;
 			return 0;
 		}
@@ -252,22 +245,22 @@ static __always_inline int parse_pkt(struct flow *fl, void *data,
 
 	eth_proto = eth->h_proto;
 #ifdef SUPPORT_QINQ
-	if (eth_proto == htons(ETH_P_8021AD)) {
+	if (eth_proto == bpf_htons(ETH_P_8021AD)) {
 		struct vlan_hdr *vhdr;
 
 		vhdr = nh;
-		if (vhdr + 1 > data_end)
+		if ((void *)(vhdr + 1) > data_end)
 			return -1;
 
 		nh += sizeof(*vhdr);
 		eth_proto = vhdr->h_vlan_encapsulated_proto;
 	}
 #endif
-	if (eth_proto == htons(ETH_P_8021Q)) {
+	if (eth_proto == bpf_htons(ETH_P_8021Q)) {
 		struct vlan_hdr *vhdr;
 
 		vhdr = nh;
-		if (vhdr + 1 > data_end)
+		if ((void *)(vhdr + 1) > data_end)
 			return -1;
 
 		nh += sizeof(*vhdr);
@@ -275,10 +268,10 @@ static __always_inline int parse_pkt(struct flow *fl, void *data,
 	}
 
 	fl->eth_proto = eth_proto;
-	if (eth_proto == htons(ETH_P_IP))
+	if (eth_proto == bpf_htons(ETH_P_IP))
 		rc = parse_v4(fl, nh, data_end, flags);
 #ifdef ENABLE_FLOW_IPV6
-	else if (eth_proto == htons(ETH_P_IPV6))
+	else if (eth_proto == bpf_htons(ETH_P_IPV6))
 		rc = parse_v6(fl, nh, data_end, flags);
 #endif
 	else

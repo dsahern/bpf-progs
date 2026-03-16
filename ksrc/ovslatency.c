@@ -4,33 +4,30 @@
  * Copyright (c) 2020 David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "ovslatency"
-#include <linux/bpf.h>
-#include <linux/ptrace.h>
-#include <linux/version.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
 #include "ovslatency.h"
 
-struct bpf_map_def SEC("maps") ovslat_map = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(u32),
-	.value_size = sizeof(struct ovslat_hist_val),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct ovslat_hist_val);
+} ovslat_map SEC(".maps");
 
 struct ovs_enter {
 	u64 t_enter;
 	void *skb;
 };
 
-struct bpf_map_def SEC("maps") ovs_enter_map = {
-	.type           = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size       = sizeof(u32),
-	.value_size     = sizeof(struct ovs_enter),
-	.max_entries    = 1
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct ovs_enter);
+} ovs_enter_map SEC(".maps");
 
 SEC("kprobe/ovs_vport_receive")
 int bpf_ovs_kprobe(struct pt_regs *ctx)
@@ -94,4 +91,3 @@ out:
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;

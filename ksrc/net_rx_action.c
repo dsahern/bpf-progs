@@ -4,33 +4,30 @@
  * Copyright (c) 2020 David Ahern <dsahern@gmail.com>
  */
 
-#define KBUILD_MODNAME "net_rx_action"
-#include <linux/bpf.h>
-#include <linux/ptrace.h>
-#include <linux/version.h>
+#include "vmlinux.h"
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
 #include "net_rx_action.h"
 
-struct bpf_map_def SEC("maps") net_rx_map = {
-	.type = BPF_MAP_TYPE_ARRAY,
-	.key_size = sizeof(u32),
-	.value_size = sizeof(struct net_rx_hist_val),
-	.max_entries = 1,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct net_rx_hist_val);
+} net_rx_map SEC(".maps");
 
 struct net_rx_enter {
 	u64 t_enter;
 	int cpu;
 };
 
-struct bpf_map_def SEC("maps") net_rx_enter_map = {
-	.type           = BPF_MAP_TYPE_PERCPU_ARRAY,
-	.key_size       = sizeof(u32),
-	.value_size     = sizeof(struct net_rx_enter),
-	.max_entries    = 1
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct net_rx_enter);
+} net_rx_enter_map SEC(".maps");
 
 SEC("kprobe/net_rx_action")
 int bpf_net_rx_kprobe(struct pt_regs *ctx)
@@ -118,4 +115,3 @@ out:
 }
 
 char _license[] SEC("license") = "GPL";
-int _version SEC("version") = LINUX_VERSION_CODE;
