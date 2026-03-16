@@ -455,7 +455,6 @@ static void print_usage(char *prog)
 
 int main(int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = { };
 	struct perf_event_ctx ctx = {
 		.event_timestamp = event_timestamp,
 		.process_event = process_event,
@@ -463,6 +462,11 @@ int main(int argc, char **argv)
 		.data_size = sizeof(struct data),
 	};
 	char *objfile = "pktlatency.o";
+	const char *bpf_fn[] = {
+		"skb/skb_copy_datagram_iovec",
+		"sched/sched_process_exit",
+		NULL,
+	};
 	const char *tps[] = {
 		"skb/skb_copy_datagram_iovec",
 		"sched/sched_process_exit",
@@ -516,10 +520,10 @@ int main(int argc, char **argv)
 	if (set_reftime())
 		return 1;
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
-	rc = configure_tracepoints(obj, tps);
+	rc = configure_tracepoints(obj, bpf_fn, tps);
 	if (rc)
 		return rc;
 
@@ -558,5 +562,6 @@ int main(int argc, char **argv)
 		return 1;
 
 	/* main event loop */
-	return perf_event_loop(&ctx);
+	perf_event_loop(&ctx);
+	return 0;
 }

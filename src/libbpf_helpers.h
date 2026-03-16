@@ -4,9 +4,8 @@
 
 #include <bpf/libbpf.h>
 
-int load_obj_file(struct bpf_prog_load_attr *attr,
-                  struct bpf_object **obj,
-                  const char *objfile, bool user_set);
+int load_obj_file(const char *objfile, bool user_set,
+                  struct bpf_object **obj);
 
 int bpf_map_get_fd_by_name(const char *name);
 int bpf_map_get_fd_by_path(const char *path);

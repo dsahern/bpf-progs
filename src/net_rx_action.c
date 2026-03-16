@@ -93,7 +93,6 @@ static void print_usage(char *prog)
 
 int main(int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = { };
 	struct net_rx_hist_val hist2 = {};
 	char *objfile = "net_rx_action.o";
 	struct kprobe_data probes[] = {
@@ -140,7 +139,7 @@ int main(int argc, char **argv)
 	setlinebuf(stderr);
 	setlocale(LC_NUMERIC, "en_US.utf-8");
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
 	map = bpf_object__find_map_by_name(obj, "net_rx_map");

@@ -158,9 +158,11 @@ int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
 				 probes[i].retprobe ? "_ret" : "");
 		}
 
-		prog = bpf_object__find_program_by_title(obj, buf);
+		prog = bpf_object__find_program_by_name(obj, buf);
 		if (!prog) {
-			printf("Failed to get prog in obj file\n");
+			fprintf(stderr,
+				"%s: Failed to get prog \"%s\" in obj file\n",
+				__func__, buf);
 			rc = 1;
 			continue;
 		}

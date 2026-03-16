@@ -1,11 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0
-/* perf_event_poller_multi and related functions and structures are based
- * on tools/testing/selftests/bpf/trace_helpers.c from around the v5.3
- * kernel and then adapted to the needs of the commands in this repo.
- *
- * Rest of the functions were added for time sorting perf events across
- * cpus, and helpers developed as common code across various commands.
- */
 #include <linux/perf_event.h>
 #include <linux/list.h>
 #include <linux/rbtree.h>
@@ -25,6 +18,7 @@
 #include <errno.h>
 #include <bpf/bpf.h>
 
+#include "linux_utils.h"
 #include "perf_events.h"
 #include "timestamps.h"
 
@@ -35,6 +29,8 @@ struct event {
 	struct rb_node rb_node;
 	struct list_head list;
 	__u64 time;
+	int cpu;
+	int resvd;
 	__u8 data[];
 };
 
@@ -61,8 +57,12 @@ static void insert_event(struct perf_event_ctx *ctx, struct event *e_new)
 		else if (e->time < e_new->time)
 			node = &(*node)->rb_right;
 		else {
-			free(e_new);
-			ctx->time_drops++;
+			if (e->cpu != e_new->cpu) {
+				list_add(&e->list, &e_new->list);
+			} else {
+				free(e_new);
+				ctx->time_drops++;
+			}
 			return;
 		}
 	}
@@ -76,9 +76,6 @@ static void __process_event(struct perf_event_ctx *ctx, struct event *event)
 	struct event *e, *tmp;
 
 	ctx->process_event(ctx, &event->data);
-
-	if (event->list.prev == event->list.next)
-		return;
 
 	list_for_each_entry_safe(e, tmp, &event->list, list) {
 		list_del(&e->list);
@@ -131,8 +128,9 @@ void perf_event_process_events(struct perf_event_ctx *ctx)
 /*
  * Add event to time sorted backlog queue
  */
-static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size)
+static void perf_output_fn(void *_ctx, int cpu, void *_data, __u32 size)
 {
+	struct perf_event_ctx *ctx = _ctx;
 	struct data *data = _data;
 	struct event *event;
 
@@ -140,22 +138,22 @@ static int __handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size
 		fprintf(stderr,
 			"Event size %d is less than data size %d\n",
 			size, ctx->data_size);
-		return LIBBPF_PERF_EVENT_ERROR;
+		return;
 	}
 
 	event = malloc(sizeof(*event) + ctx->data_size);
 	if (!event) {
 		fprintf(stderr, "Failed to allocate memory for event\n");
-		return LIBBPF_PERF_EVENT_ERROR;
+		return;
 	}
+
 	INIT_LIST_HEAD(&event->list);
 
 	event->time = ctx->event_timestamp(ctx, data);
+	event->cpu = cpu;
 	memcpy(&event->data, data, ctx->data_size);
 	insert_event(ctx, event);
 	ctx->total_events++;
-
-	return LIBBPF_PERF_EVENT_CONT;
 }
 
 int sys_perf_event_open(struct perf_event_attr *attr,
@@ -167,204 +165,60 @@ int sys_perf_event_open(struct perf_event_attr *attr,
 	return syscall(__NR_perf_event_open, attr, pid, cpu, group_fd, flags);
 }
 
-static int perf_event_mmap_header(struct perf_event_ctx *ctx, int fd,
-				  struct perf_event_mmap_page **header)
-{
-	void *base;
-	int mmap_size;
-
-	ctx->page_size = getpagesize();
-	mmap_size = ctx->page_size * (ctx->page_cnt + 1);
-
-	base = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (base == MAP_FAILED) {
-		fprintf(stderr, "mmap err\n");
-		return -1;
-	}
-
-	*header = base;
-	return 0;
-}
-
 struct perf_event_sample {
 	struct perf_event_header header;
 	__u32 size;
 	char data[];
 };
 
-static enum bpf_perf_event_ret
-bpf_perf_event_print(struct perf_event_header *hdr, void *private_data)
+static void perf_event_lost_fn(void *_ctx, int cpu, __u64 cnt)
 {
-	struct perf_event_sample *e = (struct perf_event_sample *)hdr;
-	struct perf_event_ctx *ctx = private_data;
-	int ret;
+	struct perf_event_ctx *ctx = _ctx;
 
-	if (e->header.type == PERF_RECORD_SAMPLE) {
-		ret = ctx->output_fn(ctx, e->data, e->size);
-		if (ret != LIBBPF_PERF_EVENT_CONT)
-			return ret;
-	} else if (e->header.type == PERF_RECORD_LOST) {
-		struct {
-			struct perf_event_header header;
-			__u64 id;
-			__u64 lost;
-		} *lost = (void *) e;
-		fprintf(stderr, "lost %lld events\n", lost->lost);
-	} else {
-		fprintf(stderr, "unknown event type=%d size=%d\n",
-		       e->header.type, e->header.size);
-	}
-
-	return LIBBPF_PERF_EVENT_CONT;
-}
-
-static int perf_event_poller_multi(struct perf_event_ctx *ctx)
-{
-	enum bpf_perf_event_ret ret = LIBBPF_PERF_EVENT_DONE;
-	int page_size = ctx->page_size;
-	int page_cnt = ctx->page_cnt;
-	struct pollfd *pfds;
-	int timeout = 1000;
-	void *buf = NULL;
-	size_t len = 0;
-	int i;
-
-	pfds = calloc(ctx->num_cpus, sizeof(*pfds));
-	if (!pfds)
-		return LIBBPF_PERF_EVENT_ERROR;
-
-	for (i = 0; i < ctx->num_cpus; i++) {
-		pfds[i].fd = ctx->pmu_fds[i];
-		pfds[i].events = POLLIN;
-	}
-
-	for (;;) {
-		poll(pfds, ctx->num_cpus, timeout);
-
-		if (ctx->start_fn)
-			ctx->start_fn();
-
-		for (i = 0; i < ctx->num_cpus; i++) {
-			ret = bpf_perf_event_read_simple(ctx->headers[i],
-							 page_cnt * page_size,
-							 page_size, &buf, &len,
-							 bpf_perf_event_print,
-							 ctx);
-			if (ret != LIBBPF_PERF_EVENT_CONT)
-				break;
-		}
-
-		if (ctx->complete_fn && ctx->complete_fn(ctx))
-			break;
-	}
-	free(buf);
-	free(pfds);
-
-	return ret;
-}
-
-static int perf_event_output(struct perf_event_ctx *ctx, int map_fd,
-			     int nevents)
-{
-	struct perf_event_attr attr = {
-		.sample_type = PERF_SAMPLE_RAW,
-		.type = PERF_TYPE_SOFTWARE,
-		.config = PERF_COUNT_SW_BPF_OUTPUT,
-		.size = sizeof(attr),
-		.wakeup_events = nevents, /* get an fd notification for every event */
-	};
-	int i;
-
-	for (i = 0; i < ctx->num_cpus; i++) {
-		int key = i;
-
-		ctx->pmu_fds[i] = sys_perf_event_open(&attr, i, 0);
-		if (ctx->pmu_fds[i] < 0) {
-			fprintf(stderr, "sys_perf_event_open failed: %d: %s\n",
-				errno, strerror(errno));
-			return -1;
-		}
-		if (bpf_map_update_elem(map_fd, &key, &ctx->pmu_fds[i], BPF_ANY)) {
-			fprintf(stderr, "bpf_map_update_elem failed\n");
-			return -1;
-		}
-		ioctl(ctx->pmu_fds[i], PERF_EVENT_IOC_ENABLE, 0);
-	}
-
-	return 0;
+	ctx->lost_events++;
 }
 
 int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
 			 const char *map_name, int nevents)
 {
+	struct perf_buffer_opts opts = {
+		.sz = sizeof(opts),
+		.sample_period = 1,
+	};
 	struct bpf_map *map;
-	int map_fd, i;
+	int map_fd;
 
 	ctx->num_cpus = get_nprocs() ? : MAX_CPUS;
 	if (ctx->num_cpus > MAX_CPUS)
 		ctx->num_cpus = MAX_CPUS;
 
-	ctx->page_size = getpagesize();
-
 	if (!ctx->page_cnt)
 		ctx->page_cnt = 256;  /* pages per mmap */
 
-	ctx->pmu_fds = calloc(ctx->num_cpus, sizeof(int));
-	if (!ctx->pmu_fds) {
-		fprintf(stderr, "Failed to allocate memory for pmu fds\n");
-		return 1;
-	}
-
-	ctx->headers = calloc(ctx->num_cpus, sizeof(struct perf_event_mmap_page *));
-	if (!ctx->headers) {
-		fprintf(stderr, "Failed to allocate memory for mmap_page\n");
-		goto err_out;
-	}
-
 	if (!ctx->output_fn)
-		ctx->output_fn = __handle_bpf_output;
+		ctx->output_fn = perf_output_fn;
 
 	map = bpf_object__find_map_by_name(obj, map_name);
 	if (!map) {
-		fprintf(stderr, "Failed to get map in obj file\n");
-		goto err_out;
+		fprintf(stderr, "Failed to get map \"%s\" in obj file\n",
+			map_name);
+		return 1;
 	}
 
 	map_fd = bpf_map__fd(map);
 
-	if (perf_event_output(ctx, map_fd, nevents))
-		goto err_out;
-
-	for (i = 0; i < ctx->num_cpus; i++) {
-		int err;
-
-		err = perf_event_mmap_header(ctx, ctx->pmu_fds[i],
-					     &ctx->headers[i]);
-		if (err < 0)
-			goto err_out;
-	}
-
-	return 0;
-err_out:
-	free(ctx->pmu_fds);
-	free(ctx->headers);
-	return 1;
+	ctx->pb = perf_buffer__new(map_fd, ctx->page_cnt, ctx->output_fn,
+				   perf_event_lost_fn, ctx, &opts);
+	return IS_ERR_OR_NULL(ctx->pb) ? 1 : 0;
 }
 
 void perf_event_close(struct perf_event_ctx *ctx)
 {
-	int i;
-
 	printf("total events: %llu\n", ctx->total_events);
+	printf("lost events: %llu\n", ctx->lost_events);
 	printf("drops due to time collision: %llu\n", ctx->time_drops);
 
-	for (i = 0; i < ctx->num_cpus; i++) {
-		ioctl(ctx->pmu_fds[i], PERF_EVENT_IOC_DISABLE, 0);
-		close(ctx->pmu_fds[i]);
-	}
-
-	free(ctx->pmu_fds);
-	free(ctx->headers);
+	perf_buffer__free(ctx->pb);
 }
 
 int perf_event_tp_set_prog(int prog_fd, __u64 config)
@@ -441,20 +295,19 @@ int tracepoint_perf_event(int prog_fd, const char *name)
 /* tps is a NULL terminated array of tracepoint names.
  * bpf program is expected to be named tracepoint/%s
  */
-int configure_tracepoints(struct bpf_object *obj, const char *tps[])
+int configure_tracepoints(struct bpf_object *obj, const char *bpf_fn[],
+			  const char *tps[])
 {
         struct bpf_program *prog;
         int prog_fd, fd;
         int i;
 
         for (i = 0; tps[i]; ++i) {
-                char buf[256];
-
-                snprintf(buf, sizeof(buf), "tracepoint/%s", tps[i]);
-
-		prog = bpf_object__find_program_by_title(obj, buf);
+		prog = bpf_object__find_program_by_name(obj, bpf_fn[i]);
 		if (!prog) {
-			printf("Failed to get prog in obj file\n");
+			fprintf(stderr,
+				"%s: Failed to get prog \"%s\" in obj file\n",
+				__func__, bpf_fn[i]);
 			return 1;
 		}
 		prog_fd = bpf_program__fd(prog);
@@ -474,7 +327,8 @@ int configure_tracepoints(struct bpf_object *obj, const char *tps[])
 /* tps is a NULL terminated array of tracepoint names.
  * bpf program is expected to be named tracepoint/%s
  */
-int configure_raw_tracepoints(struct bpf_object *obj, const char *tps[])
+int configure_raw_tracepoints(struct bpf_object *obj, const char *bpf_fn[],
+			      const char *tps[])
 {
         struct bpf_program *prog;
         int prog_fd, fd;
@@ -482,13 +336,12 @@ int configure_raw_tracepoints(struct bpf_object *obj, const char *tps[])
 
         for (i = 0; tps[i]; ++i) {
 		const char *tp;
-                char buf[256];
 
-		snprintf(buf, sizeof(buf), "raw_tracepoint/%s", tps[i]);
-
-		prog = bpf_object__find_program_by_title(obj, buf);
+		prog = bpf_object__find_program_by_name(obj, bpf_fn[i]);
 		if (!prog) {
-			printf("Failed to get prog in obj file\n");
+			fprintf(stderr,
+				"%s: Failed to get prog \"%s\" in obj file\n",
+				__func__, bpf_fn[i]);
 			return 1;
 		}
 		prog_fd = bpf_program__fd(prog);
@@ -499,6 +352,7 @@ int configure_raw_tracepoints(struct bpf_object *obj, const char *tps[])
 			tp++;
 		else
 			tp = tps[i];
+
 		fd = bpf_raw_tracepoint_open(tp, prog_fd);
 		if (fd < 0) {
 			fprintf(stderr,
@@ -567,7 +421,14 @@ int perf_event_syscall(int prog_fd, const char *name)
 	return perf_event_tp_set_prog(prog_fd, id);
 }
 
-int perf_event_loop(struct perf_event_ctx *ctx)
+void perf_event_loop(struct perf_event_ctx *ctx)
 {
-	return perf_event_poller_multi(ctx);
+	int timeout = 1000;
+
+	for (;;) {
+		perf_buffer__poll(ctx->pb, timeout);
+
+		if (ctx->complete_fn && ctx->complete_fn(ctx))
+			break;
+	}
 }

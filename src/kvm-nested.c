@@ -80,10 +80,14 @@ static void print_usage(char *prog)
 
 int main(int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = { };
 	char *objfile = "kvm-nested.o";
 	struct kprobe_data probes[] = {
 		{ .func = "handle_vmresume", .fd = -1 },
+	};
+	const char *bpf_fn[] = {
+		"bpf_kvm_nested_exit",
+		"bpf_sched_exit",
+		NULL
 	};
 	const char *tps[] = {
 		"kvm/kvm_nested_vmexit",
@@ -132,7 +136,7 @@ int main(int argc, char **argv)
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
 	map = bpf_object__find_map_by_name(obj, "nested_virt_map");
@@ -147,7 +151,7 @@ int main(int argc, char **argv)
 		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 			goto out;
 	} else {
-		if (configure_tracepoints(obj, tps))
+		if (configure_tracepoints(obj, bpf_fn, tps))
 			goto out;
 	}
 

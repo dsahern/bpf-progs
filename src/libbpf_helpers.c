@@ -6,6 +6,7 @@
  */
 
 #include <linux/if_link.h>
+#include <linux/kernel.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
@@ -14,6 +15,7 @@
 #include <bpf/libbpf.h>
 #include <errno.h>
 
+#include "linux_utils.h"
 #include "libbpf_helpers.h"
 
 enum bpf_obj_type {
@@ -24,44 +26,68 @@ enum bpf_obj_type {
 	BPF_OBJ_BTF,
 };
 
-int load_obj_file(struct bpf_prog_load_attr *attr,
-		  struct bpf_object **obj,
-		  const char *objfile, bool user_set)
+int load_obj_file(const char *objfile, bool user_set,
+		  struct bpf_object **pobj)
 {
 	static char *expected_paths[] = {
 		"bin",
 		"ksrc/obj",	/* path in git tree */
 		"bpf-obj",
 		".",		/* cwd */
-		NULL,
 	};
-	char path[PATH_MAX];
-	int prog_fd, i = 0;
+	//char log_buf[128];
+	struct bpf_object_open_opts opts = {
+		.sz = sizeof(opts),
+		//.kernel_log_buf = log_buf,
+		//.kernel_log_size = sizeof(log_buf),
+		.kernel_log_level = 4,
+	};
+	struct bpf_object *obj;
+	int i;
 
 	if (user_set) {
-		attr->file = objfile;
-		return bpf_prog_load_xattr(attr, obj, &prog_fd);
-	}
+		obj = bpf_object__open_file(objfile, &opts);
+		if (!obj)
+			return -1;
+	} else {
+		char path[PATH_MAX];
 
-	attr->file = path;
-	while (expected_paths[i]) {
-		struct stat sbuf;
+		obj = NULL;
+		for (i = 0; i < ARRAY_SIZE(expected_paths); ++i) {
+			struct stat sbuf;
 
-		snprintf(path, sizeof(path), "%s/%s",
-			 expected_paths[i], objfile);
+			snprintf(path, sizeof(path), "%s/%s",
+				 expected_paths[i], objfile);
 
-		if (stat(path, &sbuf) == 0) {
-			if (!bpf_prog_load_xattr(attr, obj, &prog_fd))
-				return 0;
+			if (stat(path, &sbuf))
+				continue;
 
-			if (errno != ENOENT)
+			obj = bpf_object__open_file(objfile, &opts);
+			if (obj)
 				break;
 		}
-		++i;
 	}
 
-	fprintf(stderr, "Failed to find object file; nothing to load\n");
-	return 1;
+	if (!obj) {
+		fprintf(stderr, "Failed to find object file\n");
+		return -1;
+	}
+
+	//if (bpf_object__prepare(obj)) {
+	//	fprintf(stderr, "Failed to prepare object for loading\n");
+	//	goto err_out;
+	//}
+	if (bpf_object__load(obj)) {
+		fprintf(stderr, "Failed to load object\n");
+		goto err_out;
+	}
+
+	*pobj = obj;
+	return 0;
+
+err_out:
+	bpf_object__close(obj);
+	return -1;
 }
 
 int bpf_map_get_fd_by_name(const char *name)
@@ -263,7 +289,7 @@ int attach_to_dev_generic(int idx, int prog_fd, const char *dev)
 {
 	int err;
 
-	err = bpf_set_link_xdp_fd(idx, prog_fd, XDP_FLAGS_SKB_MODE);
+	err = bpf_xdp_attach(idx, prog_fd, XDP_FLAGS_SKB_MODE, NULL);
 	if (err < 0) {
 		printf("ERROR: failed to attach program to %s\n", dev);
 		return err;
@@ -276,7 +302,7 @@ int detach_from_dev_generic(int idx, const char *dev)
 {
 	int err;
 
-	err = bpf_set_link_xdp_fd(idx, -1, XDP_FLAGS_SKB_MODE);
+	err = bpf_xdp_detach(idx, XDP_FLAGS_SKB_MODE, NULL);
 	if (err < 0)
 		printf("ERROR: failed to detach program from %s\n", dev);
 
@@ -288,7 +314,7 @@ int attach_to_dev(int idx, int prog_fd, const char *dev)
 {
 	int err;
 
-	err = bpf_set_link_xdp_fd(idx, prog_fd, XDP_FLAGS_DRV_MODE);
+	err = bpf_xdp_attach(idx, prog_fd, XDP_FLAGS_DRV_MODE, NULL);
 	if (err < 0) {
 		printf("ERROR: failed to attach program to %s\n", dev);
 		return err;
@@ -301,7 +327,7 @@ int detach_from_dev(int idx, const char *dev)
 {
 	int err;
 
-	err = bpf_set_link_xdp_fd(idx, -1, 0);
+	err = bpf_xdp_detach(idx, XDP_FLAGS_DRV_MODE, NULL);
 	if (err < 0)
 		printf("ERROR: failed to detach program from %s\n", dev);
 

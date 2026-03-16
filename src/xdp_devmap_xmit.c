@@ -89,7 +89,10 @@ static void print_usage(char *prog)
 
 int main(int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = { };
+	const char *bpf_fn[] = {
+		"bpf_devmap_xmit",
+		NULL
+	};
 	const char *tps[] = {
 		"xdp/xdp_devmap_xmit",
 		NULL
@@ -136,7 +139,7 @@ int main(int argc, char **argv)
 	setlinebuf(stderr);
 	setlocale(LC_NUMERIC, "en_US.utf-8");
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
 	map = bpf_object__find_map_by_name(obj, "devmap_xmit_map");
@@ -149,7 +152,7 @@ int main(int argc, char **argv)
 	/* make sure index 0 entry exists */
 	bpf_map_update_elem(hist_map_fd, &idx, &hist, BPF_ANY);
 
-	if (configure_tracepoints(obj, tps))
+	if (configure_tracepoints(obj, bpf_fn, tps))
 		return 1;
 
 	while (!done) {

@@ -10,6 +10,7 @@
  * General Public License for more details.
  */
 
+#include <linux/if_ether.h>
 #include <limits.h>
 #include <net/if.h>
 #include <errno.h>

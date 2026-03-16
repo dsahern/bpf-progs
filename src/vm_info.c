@@ -5,6 +5,7 @@
  */
 
 #include <linux/bpf.h>
+#include <linux/if_ether.h>
 #include <limits.h>
 #include <net/if.h>
 #include <netinet/in.h>

@@ -160,9 +160,6 @@ static void sig_handler(int signo)
 
 int main(int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = {
-		.prog_type	= BPF_PROG_TYPE_KPROBE,
-	};
 	struct perf_event_ctx ctx = {
 		.event_timestamp = event_timestamp,
 		.process_event = process_event,
@@ -198,7 +195,7 @@ int main(int argc, char **argv)
 	setlinebuf(stderr);
 	setlocale(LC_NUMERIC, "en_US.utf-8");
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
 	rc = 1;
@@ -209,7 +206,8 @@ int main(int argc, char **argv)
 		goto out;
 
 	/* main event loop */
-	rc = perf_event_loop(&ctx);
+	perf_event_loop(&ctx);
+	rc = 0;
 out:
 	perf_event_close(&ctx);
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));

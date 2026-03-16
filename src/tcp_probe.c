@@ -246,12 +246,15 @@ static void print_usage(char *prog)
 int main(int argc, char **argv)
 {
 	char *objfile = "tcp_probe.o";
-	struct bpf_prog_load_attr prog_load_attr = { };
 	struct perf_event_ctx ctx = {
 		.event_timestamp = event_timestamp,
 		.process_event = process_event,
 		.complete_fn = tcpprobe_complete,
 		.data_size = sizeof(struct data),
+	};
+	const char *bpf_fn[] = {
+		"bpf_tcp_probe",
+		NULL
 	};
 	const char *tps[] = {
 		"tcp/tcp_probe",
@@ -295,10 +298,10 @@ int main(int argc, char **argv)
 	if (set_reftime())
 		return 1;
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
-	if (configure_tracepoints(obj, tps))
+	if (configure_tracepoints(obj, bpf_fn, tps))
 		return 1;
 
 	if (signal(SIGINT, sig_handler) ||
@@ -317,5 +320,7 @@ int main(int argc, char **argv)
 	print_header();
 
 	/* main event loop */
-	return perf_event_loop(&ctx);
+	perf_event_loop(&ctx);
+
+	return 0;
 }

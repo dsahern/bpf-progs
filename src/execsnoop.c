@@ -164,6 +164,7 @@ static void process_event(struct perf_event_ctx *ctx, void *_data)
 			data->time, data->cpu, event_names[data->event_type],
 			data->comm, data->tid, data->pid,
 			data->comm, data->arg, data);
+
 	task = get_task(data, data->event_type == EVENT_START);
 	if (!task) {
 		if (data->event_type != EVENT_EXIT && verbose) {
@@ -182,7 +183,7 @@ static void process_event(struct perf_event_ctx *ctx, void *_data)
 			task->arg[i] = NULL;
 		}
 
-		if (data->arg)
+		if (*data->arg)
 			task->arg[0] = strdup(data->arg);
 		else
 			task->arg[0] = strdup("<unknown>");
@@ -190,7 +191,7 @@ static void process_event(struct perf_event_ctx *ctx, void *_data)
 		break;
 	case EVENT_ARG:
 		i = task->narg;
-		if (data->arg)
+		if (*data->arg)
 			task->arg[i] = strdup(data->arg);
 		else
 			task->arg[i] = strdup("<unknown>");
@@ -248,19 +249,27 @@ static void print_usage(char *prog)
 
 int main(int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = {};
 	struct kprobe_data probes[] = {
 		{ .prog = "kprobe/execve",     .func = "__x64_sys_execve",
 		  .fd = -1 },
 		{ .prog = "kprobe/execve_ret", .func = "__x64_sys_execve",
 		  .fd = -1, .retprobe = true },
 	};
-	const char *tps_exec[] = {
+	const char *bpf_fn_exec[] = {
+		"bpf_sys_enter_execve",
+		"bpf_sys_exit_execve",
+		NULL
+	};
+	const char *tp_exec[] = {
 		"syscalls/sys_enter_execve",
 		"syscalls/sys_exit_execve",
 		NULL
 	};
-	const char *tps[] = {
+	const char *bpf_fn[] = {
+		"bpf_sched_exit",
+		NULL
+	};
+	const char *tp[] = {
 		"sched/sched_process_exit",
 		NULL
 	};
@@ -327,18 +336,18 @@ int main(int argc, char **argv)
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
 	rc = 1;
 	if (use_kprobe) {
 		if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 			goto out;
-	} else if (configure_tracepoints(obj, tps_exec)) {
+	} else if (configure_tracepoints(obj, bpf_fn_exec, tp_exec)) {
 		goto out;
 	}
 
-	if (configure_tracepoints(obj, tps))
+	if (configure_tracepoints(obj, bpf_fn, tp))
 		goto out;
 
 	if (perf_event_configure(&ctx, obj, "channel", nevents))
@@ -347,7 +356,8 @@ int main(int argc, char **argv)
 	print_header();
 
 	/* main event loop */
-	rc = perf_event_loop(&ctx);
+	perf_event_loop(&ctx);
+	rc = 0;
 out:
 	perf_event_close(&ctx);
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));

@@ -52,14 +52,11 @@ static void usage(const char *prog)
 
 int main(int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = {
-		.prog_type	= BPF_PROG_TYPE_XDP,
-	};
 	const char *objfile = "xdp_l3fwd_kern.o";
 	const char *prog_name = "xdp_l3fwd";
+	int prog_fd = -1, map_fd = -1;
 	bool filename_set = false;
 	struct bpf_program *prog;
-	int prog_fd, map_fd = -1;
 	struct bpf_object *obj;
 	int opt, i, idx, err;
 	bool attach = true;
@@ -89,10 +86,10 @@ int main(int argc, char **argv)
 	}
 
 	if (attach) {
-		if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+		if (load_obj_file(objfile, filename_set, &obj))
 			return 1;
 
-		prog = bpf_object__find_program_by_title(obj, prog_name);
+		prog = bpf_object__find_program_by_name(obj, prog_name);
 		prog_fd = bpf_program__fd(prog);
 		if (prog_fd < 0) {
 			printf("program not found: %s\n", strerror(prog_fd));

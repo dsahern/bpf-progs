@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2019-2020 David Ahern <dsahern@gmail.com>
  */
+#include <linux/types.h>
 #include <linux/bpf.h>
 #include <linux/if_arp.h>
 #include <linux/ipv6.h>
@@ -870,11 +871,11 @@ static void show_packet(struct data *data, struct ksym_s *sym)
 	if (sym) {
 		__u64 offset = data->location - sym->addr;
 
-		printf("%s+0x%llx (%llx)",
+		printf("%s+0x%llx (%llx) ",
 		       sym->name, offset, data->location);
 		is_unix = sym->is_unix;
 	} else {
-		printf("%llx", data->location);
+		printf("%llx ", data->location);
 		is_unix = false;
 	}
 	printf("reason %u\n", data->reason);
@@ -898,7 +899,7 @@ static void show_packet(struct data *data, struct ksym_s *sym)
 	printf("\n");
 }
 
-static int handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size)
+static void handle_bpf_output(void *_ctx, int cpu, void *_data, __u32 size)
 {
 	struct data *data = _data;
 	struct ksym_s *sym;
@@ -907,7 +908,7 @@ static int handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size)
 		fprintf(stderr,
 			"Event size %d is less than data size %ld\n",
 			size, sizeof(*data));
-		return LIBBPF_PERF_EVENT_ERROR;
+		return;
 	}
 
 	switch (data->event_type) {
@@ -918,7 +919,7 @@ static int handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size)
 		    (skip_unix && sym->is_unix) ||
 		    (skip_tcp && sym->is_tcp &&
 		     data->pkt_type == PACKET_HOST))
-			goto out;
+			return;
 
 		total_pkts++;
 		if (do_hist)
@@ -933,10 +934,8 @@ static int handle_bpf_output(struct perf_event_ctx *ctx, void *_data, int size)
 
 	if (pktcnt && total_pkts >= pktcnt) {
 		done = 1;
-		return LIBBPF_PERF_EVENT_DONE;
+		return;
 	}
-out:
-	return LIBBPF_PERF_EVENT_CONT;
 }
 
 static int pktdrop_complete(struct perf_event_ctx *ctx)
@@ -1011,7 +1010,6 @@ static void print_dropmon_usage(const char *prog)
 
 static int drop_monitor(const char *prog, int argc, char **argv)
 {
-	struct bpf_prog_load_attr prog_load_attr = { };
 	const char *kallsyms = "/proc/kallsyms";
 	struct perf_event_ctx ctx = {
 		.output_fn = handle_bpf_output,
@@ -1023,11 +1021,15 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 	struct kprobe_data probes[] = {
 		{ .func = "fib_net_exit", .fd = -1 },
 	};
+	const char *bpf_fn[] = {
+		"bpf_kfree_skb",
+		NULL,
+	};
 	const char *tps[] = {
 		"skb/kfree_skb",
 		NULL,
 	};
-	struct bpf_object *obj;
+	struct bpf_object *obj = NULL;
 	int nevents = 1000;
 	int pg_cnt = 0;
 	int rc, r;
@@ -1116,10 +1118,10 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		return 1;
 	}
 
-	if (load_obj_file(&prog_load_attr, &obj, objfile, filename_set))
+	if (load_obj_file(objfile, filename_set, &obj))
 		return 1;
 
-	if (configure_tracepoints(obj, tps))
+	if (configure_tracepoints(obj, bpf_fn, tps))
 		return 1;
 
 	rc = 1;
@@ -1137,8 +1139,11 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		alarm(display_rate);
 
 	/* main event loop */
-	rc = perf_event_loop(&ctx);
+	perf_event_loop(&ctx);
+	rc = 0;
 out:
+	if (obj)
+		bpf_object__close(obj);
 	perf_event_close(&ctx);
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));
 	return rc;
