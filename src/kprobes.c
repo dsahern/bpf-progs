@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include "kprobes.h"
+#include "utils.h"
 #include "perf_events.h"
 
 static int kprobes_event_id(const char *event)
@@ -105,29 +106,15 @@ static int kprobe_perf_event_legacy(int prog_fd, const char *func,
 
 int kprobe_event_type(void)
 {
-	char filename[] = "/sys/bus/event_source/devices/kprobe/type";
 	static int kprobe_type = -1;
 	static bool checked = false;
-	char buf[64] = {};
-	int fd, n;
 
 	if (checked)
 		return kprobe_type;
 
-	fd = open(filename, O_RDONLY);
-	if (fd < 0)
-		return -1;
-
-	n = read(fd, buf, sizeof(buf)-1);
-	if (n < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
-			filename);
-	} else {
-		kprobe_type = atoi(buf);
-	}
-	close(fd);
-
-	checked = true;
+	kprobe_type = read_int_from_file("/sys/bus/event_source/devices/kprobe/type");
+	if (kprobe_type != -1)
+		checked = true;
 
 	return kprobe_type;
 }

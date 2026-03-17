@@ -61,6 +61,7 @@ COMMON += $(OBJDIR)parse_pkt.o
 COMMON += $(OBJDIR)print_pkt.o
 COMMON += $(OBJDIR)ksyms.o
 COMMON += $(OBJDIR)tp_verify.o
+COMMON += $(OBJDIR)utils.o
 
 all: build $(MODS)
 
