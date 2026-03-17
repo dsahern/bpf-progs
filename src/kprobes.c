@@ -40,15 +40,11 @@ int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
 	attr_type = kprobe_event_type();
 
 	for (i = 0; i < count; ++i) {
-		char buf[256];
-
-		snprintf(buf, sizeof(buf), "%s", probes[i].prog);
-
-		prog = bpf_object__find_program_by_name(obj, buf);
+		prog = bpf_object__find_program_by_name(obj, probes[i].prog);
 		if (!prog) {
 			fprintf(stderr,
 				"%s: Failed to get prog \"%s\" in obj file\n",
-				__func__, buf);
+				__func__, probes[i].prog);
 			rc = 1;
 			continue;
 		}
