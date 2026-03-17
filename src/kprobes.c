@@ -14,30 +14,12 @@
 static int kprobes_event_id(const char *event)
 {
 	char filename[PATH_MAX];
-	int fd, n, id = -1;
-	char buf[64] = {};
 
 	/* "probes" directory for some use cases? */
 	snprintf(filename, sizeof(filename), "%s/events/kprobes/%s/id",
 		 TRACINGFS, event);
 
-	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn id for tracing event '%s'\n",
-			filename, event);
-		return -1;
-	}
-
-	n = read(fd, buf, sizeof(buf)-1);
-	if (n < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn kprobe type\n",
-			filename);
-	} else {
-		id = atoi(buf);
-	}
-	close(fd);
-
-	return id;
+	return read_int_from_file(filename);
 }
 
 static int do_kprobe_event(const char *event)
