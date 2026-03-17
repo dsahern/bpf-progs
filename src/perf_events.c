@@ -20,6 +20,7 @@
 
 #include "linux_utils.h"
 #include "perf_events.h"
+#include "uprobes.h"
 #include "timestamps.h"
 
 /*
@@ -391,6 +392,42 @@ int kprobe_perf_event(int prog_fd, const char *func, int retprobe,
 	err = ioctl(fd, PERF_EVENT_IOC_SET_BPF, prog_fd);
 	if (err) {
 		fprintf(stderr, "failed to attach bpf: %d %s\n",
+			err, strerror(errno));
+		close(fd);
+		return -1;
+	}
+
+	ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+
+	return fd;
+}
+
+int uprobe_perf_event(int prog_fd, const char *path, __u64 offset,
+		      int retprobe)
+{
+	struct perf_event_attr attr = {
+		.sample_type = PERF_SAMPLE_RAW,
+		.size = sizeof(attr),
+		.wakeup_events = 1, /* get an fd notification for every event */
+		.sample_period = 1,
+		.config = retprobe ? 1ULL : 0, /* 0 for uprobe; 1 for retprobe */
+		.uprobe_path = (__u64)path,
+		.probe_offset = offset,
+		.type = uprobe_event_type(),
+	};
+	int fd, err;
+
+	fd = sys_perf_event_open(&attr, 0, PERF_FLAG_FD_CLOEXEC);
+	if (fd < 0) {
+		fprintf(stderr,
+			"Failed to open uprobe event on '%s' offset %llx: %d %s\n",
+			path, offset, fd, strerror(errno));
+		return fd;
+	}
+
+	err = ioctl(fd, PERF_EVENT_IOC_SET_BPF, prog_fd);
+	if (err) {
+		fprintf(stderr, "Failed to attach bpf program to uprobe: %d %s\n",
 			err, strerror(errno));
 		close(fd);
 		return -1;
