@@ -11,66 +11,6 @@
 #include "utils.h"
 #include "perf_events.h"
 
-static int kprobes_event_id(const char *event)
-{
-	char filename[PATH_MAX];
-
-	/* "probes" directory for some use cases? */
-	snprintf(filename, sizeof(filename), "%s/events/kprobes/%s/id",
-		 TRACINGFS, event);
-
-	return read_int_from_file(filename);
-}
-
-static int do_kprobe_event(const char *event)
-{
-	char filename[PATH_MAX];
-
-	snprintf(filename, sizeof(filename), "%s/kprobe_events", TRACINGFS);
-
-	return write_str_to_file(filename, event);
-}
-
-static int kprobe_perf_event_legacy(int prog_fd, const char *func,
-				    bool retprobe)
-{
-	char event[128], pname[64];
-	char t = 'p';
-	int id;
-
-	if (strlen(func) + 10 > sizeof(pname)) {
-		fprintf(stderr,
-			"buf size too small in kprobe_perf_event_legacy\n");
-		return -1;
-	}
-	if (retprobe)
-		t = 'r';
-
-	/*    probe: p:kprobes/p_<func>_<pid>
-	 * retprobe: r:kprobes/r_<func>_<pid>
-	 *  delete:  -:kprobes/<p>_<func>_<pid>
-	 */
-	snprintf(pname, sizeof(pname), "%c_%s_%d", t, func, getpid());
-	if (prog_fd < 0)
-		snprintf(event, sizeof(event), "-:kprobes/%s", pname);
-	else
-		snprintf(event, sizeof(event), "%c:kprobes/%s %s", t, pname, func);
-
-	if (do_kprobe_event(event))
-		return -1;
-
-	if (prog_fd < 0)
-		return 0;
-
-	id = kprobes_event_id(pname);
-	if (id < 0) {
-		fprintf(stderr, "Failed to get id for '%s'\n", pname);
-		return -1;
-	}
-
-	return perf_event_tp_set_prog(prog_fd, id);
-}
-
 int kprobe_event_type(void)
 {
 	static int kprobe_type = -1;
@@ -115,16 +55,11 @@ int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
 		prog_fd = bpf_program__fd(prog);
 
 
-		if (attr_type < 0) {
-			probes[i].fd = kprobe_perf_event_legacy(prog_fd,
-								probes[i].func,
-								probes[i].retprobe);
-		} else {
-			probes[i].fd = kprobe_perf_event(prog_fd,
-							 probes[i].func,
-							 probes[i].retprobe,
-							 attr_type);
-		}
+		probes[i].fd = kprobe_perf_event(prog_fd,
+						 probes[i].func,
+						 probes[i].retprobe,
+						 attr_type);
+
 		if (probes[i].fd < 0) {
 			fprintf(stderr,
 				"Failed to create perf_event on %s\n",
@@ -139,17 +74,11 @@ int kprobe_init(struct bpf_object *obj, struct kprobe_data *probes,
 void kprobe_cleanup(struct kprobe_data *probes, unsigned int count)
 {
 	unsigned int i;
-	int attr_type;
 
-	attr_type = kprobe_event_type();
 	for (i = 0; i < count; ++i) {
 		if (probes[i].fd < 0)
 			continue;
 
 		close(probes[i].fd);
-		if (attr_type < 0) {
-			kprobe_perf_event_legacy(-1, probes[i].func,
-						 probes[i].retprobe);
-		}
 	}
 }

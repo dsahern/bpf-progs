@@ -284,16 +284,7 @@ int main(int argc, char **argv)
 	bool use_kprobe = true;
 	struct bpf_object *obj;
 	int nevents = 100;
-	int attr_type;
 	int rc;
-
-	attr_type = kprobe_event_type();
-	if (attr_type < 0) {
-		/* SWAG - allows execsnoop to work on 4.14 and 5.4 */
-		probes[0].func = "sys_execve";
-		probes[1].func = "sys_execve";
-		objfile = "execsnoop_legacy.o";
-	}
 
 	while ((rc = getopt(argc, argv, "f:svTDA")) != -1)
 	{

@@ -9,7 +9,6 @@ OBJDIR = obj/
 endif
 
 MODS += $(OBJDIR)execsnoop.o
-MODS += $(OBJDIR)execsnoop_legacy.o
 MODS += $(OBJDIR)opensnoop.o
 MODS += $(OBJDIR)kvm-nested.o
 
