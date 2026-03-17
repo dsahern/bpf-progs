@@ -31,3 +31,25 @@ int read_int_from_file(const char *path)
 
 	return atoi(buf);
 }
+
+int write_str_to_file(const char *path, const char *val)
+{
+	int fd, rc;
+
+	fd = open(path, O_WRONLY|O_APPEND);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to open %s: %d: %s\n",
+			path, errno, strerror(errno));
+		return -1;
+	}
+
+	if (write(fd, val, strlen(val)) != strlen(val)) {
+		fprintf(stderr, "Failed writing '%s' to '%s'\n",
+			val, path);
+		rc = -1;
+	}
+
+	close(fd);
+
+	return rc;
+}

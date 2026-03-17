@@ -25,25 +25,10 @@ static int kprobes_event_id(const char *event)
 static int do_kprobe_event(const char *event)
 {
 	char filename[PATH_MAX];
-	int rc = 0;
-	int fd;
 
 	snprintf(filename, sizeof(filename), "%s/kprobe_events", TRACINGFS);
 
-	fd = open(filename, O_WRONLY|O_APPEND);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to open '%s' to learn id for event '%s'\n",
-			filename, event);
-		return -1;
-	}
-	if (write(fd, event, strlen(event)) != strlen(event)) {
-		fprintf(stderr, "Failed writing event '%s' to '%s'\n",
-			event, filename);
-		rc = -1;
-	}
-	close(fd);
-
-	return rc;
+	return write_str_to_file(filename, event);
 }
 
 static int kprobe_perf_event_legacy(int prog_fd, const char *func,
