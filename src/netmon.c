@@ -1030,7 +1030,6 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		NULL,
 	};
 	struct bpf_object *obj = NULL;
-	int nevents = 1000;
 	int pg_cnt = 0;
 	int rc, r;
 
@@ -1132,7 +1131,7 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 		break;
 	}
 
-	if (perf_event_configure(&ctx, obj, "channel", nevents))
+	if (perf_event_configure(&ctx, obj, "channel"))
 		goto out;
 
 	if (do_hist)

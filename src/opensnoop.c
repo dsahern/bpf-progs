@@ -173,7 +173,6 @@ int main(int argc, char **argv)
 		{ .prog = "bpf_sys_open_ret", .func = "do_sys_open", .fd = -1, .retprobe = true },
 	};
 	struct bpf_object *obj;
-	int nevents = 1000;
 	int rc;
 
 	if (argc > 1) {
@@ -202,7 +201,7 @@ int main(int argc, char **argv)
 	if (kprobe_init(obj, probes, ARRAY_SIZE(probes)))
 		goto out;
 
-	if (perf_event_configure(&ctx, obj, "channel", nevents))
+	if (perf_event_configure(&ctx, obj, "channel"))
 		goto out;
 
 	/* main event loop */

@@ -262,7 +262,6 @@ int main(int argc, char **argv)
 	};
 	bool filename_set = false;
 	struct bpf_object *obj;
-	int nevents = 1000;
 	int rc;
 
 	while ((rc = getopt(argc, argv, "f:s:n:")) != -1)
@@ -314,7 +313,7 @@ int main(int argc, char **argv)
 	setlinebuf(stdout);
 	setlinebuf(stderr);
 
-	if (perf_event_configure(&ctx, obj, "channel", nevents))
+	if (perf_event_configure(&ctx, obj, "channel"))
 		return 1;
 
 	print_header();

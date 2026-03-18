@@ -179,7 +179,7 @@ static void perf_event_lost_fn(void *_ctx, int cpu, __u64 cnt)
 }
 
 int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
-			 const char *map_name, int nevents)
+			 const char *map_name)
 {
 	struct perf_buffer_opts opts = {
 		.sz = sizeof(opts),

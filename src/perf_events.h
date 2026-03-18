@@ -40,7 +40,7 @@ int perf_event_syscall(int prog_fd, const char *name);
 
 /* attach channel map to perf */
 int perf_event_configure(struct perf_event_ctx *ctx, struct bpf_object *obj,
-			 const char *map_name, int nevents);
+			 const char *map_name);
 int configure_raw_tracepoints(struct bpf_object *obj, const char *bpf_fn[],
 			      const char *tps[]);
 

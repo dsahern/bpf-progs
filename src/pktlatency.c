@@ -475,7 +475,6 @@ int main(int argc, char **argv)
 	bool filename_set = false;
 	struct bpf_object *obj;
 	struct bpf_map *map;
-	int nevents = 1000;
 	int rc, tmp;
 
 	while ((rc = getopt(argc, argv, "f:p:t:l:s")) != -1)
@@ -558,7 +557,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	if (perf_event_configure(&ctx, obj, "channel", nevents))
+	if (perf_event_configure(&ctx, obj, "channel"))
 		return 1;
 
 	/* main event loop */

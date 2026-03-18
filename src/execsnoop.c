@@ -283,7 +283,6 @@ int main(int argc, char **argv)
 	bool filename_set = false;
 	bool use_kprobe = true;
 	struct bpf_object *obj;
-	int nevents = 100;
 	int rc;
 
 	while ((rc = getopt(argc, argv, "f:svTDA")) != -1)
@@ -341,7 +340,7 @@ int main(int argc, char **argv)
 	if (configure_tracepoints(obj, bpf_fn, tp))
 		goto out;
 
-	if (perf_event_configure(&ctx, obj, "channel", nevents))
+	if (perf_event_configure(&ctx, obj, "channel"))
 		goto out;
 
 	print_header();
