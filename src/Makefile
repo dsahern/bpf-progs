@@ -53,6 +53,7 @@ endif
 
 COMMON += $(OBJDIR)perf_events.o
 COMMON += $(OBJDIR)kprobes.o
+COMMON += $(OBJDIR)uprobes.o
 COMMON += $(OBJDIR)timestamps.o
 COMMON += $(OBJDIR)libbpf_helpers.o
 COMMON += $(OBJDIR)str_utils.o
@@ -62,7 +63,7 @@ COMMON += $(OBJDIR)print_pkt.o
 COMMON += $(OBJDIR)ksyms.o
 COMMON += $(OBJDIR)tp_verify.o
 COMMON += $(OBJDIR)utils.o
-COMMON += $(OBJDIR)uprobes.o
+COMMON += $(OBJDIR)hist.o
 
 all: build $(MODS)
 
