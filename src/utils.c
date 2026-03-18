@@ -36,6 +36,7 @@ int read_string_from_file(const char *path, char *buf, ssize_t buflen)
 {
 	int fd = open(path, O_RDONLY);
 	ssize_t n;
+	char *nl;
 
 	if (fd < 0)
 		return -1;
@@ -47,6 +48,10 @@ int read_string_from_file(const char *path, char *buf, ssize_t buflen)
 		return -1;
 
 	buf[n] = '\0';
+
+	nl = strchr(buf, '\n');
+	if (nl)
+		*nl = '\0';
 
 	return 0;
 }
