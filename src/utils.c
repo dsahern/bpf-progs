@@ -32,6 +32,25 @@ int read_int_from_file(const char *path)
 	return atoi(buf);
 }
 
+int read_string_from_file(const char *path, char *buf, ssize_t buflen)
+{
+	int fd = open(path, O_RDONLY);
+	ssize_t n;
+
+	if (fd < 0)
+		return -1;
+
+	n = read(fd, buf, buflen - 1);
+	close(fd);
+
+	if (n <= 0)
+		return -1;
+
+	buf[n] = '\0';
+
+	return 0;
+}
+
 int write_str_to_file(const char *path, const char *val)
 {
 	int fd, rc;
