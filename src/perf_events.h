@@ -46,7 +46,7 @@ int configure_raw_tracepoints(struct bpf_object *obj, const char *bpf_fn[],
 
 void perf_event_close(struct perf_event_ctx *ctx);
 
-void perf_event_loop(struct perf_event_ctx *ctx);
+void perf_event_loop(struct perf_event_ctx *ctx, int timeout_ms);
 
 void perf_event_process_events(struct perf_event_ctx *ctx);
 

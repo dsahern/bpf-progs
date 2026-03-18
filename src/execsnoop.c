@@ -346,7 +346,7 @@ int main(int argc, char **argv)
 	print_header();
 
 	/* main event loop */
-	perf_event_loop(&ctx);
+	perf_event_loop(&ctx, 1000);
 	rc = 0;
 out:
 	perf_event_close(&ctx);

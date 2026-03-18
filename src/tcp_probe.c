@@ -319,7 +319,7 @@ int main(int argc, char **argv)
 	print_header();
 
 	/* main event loop */
-	perf_event_loop(&ctx);
+	perf_event_loop(&ctx, 1000);
 
 	return 0;
 }

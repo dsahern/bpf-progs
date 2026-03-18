@@ -421,10 +421,8 @@ int perf_event_syscall(int prog_fd, const char *name)
 	return perf_event_tp_set_prog(prog_fd, id);
 }
 
-void perf_event_loop(struct perf_event_ctx *ctx)
+void perf_event_loop(struct perf_event_ctx *ctx, int timeout)
 {
-	int timeout = 1000;
-
 	for (;;) {
 		perf_buffer__poll(ctx->pb, timeout);
 
