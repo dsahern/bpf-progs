@@ -62,7 +62,7 @@ int load_obj_file(const char *objfile, bool user_set,
 			if (stat(path, &sbuf))
 				continue;
 
-			obj = bpf_object__open_file(objfile, &opts);
+			obj = bpf_object__open_file(path, &opts);
 			if (obj)
 				break;
 		}
