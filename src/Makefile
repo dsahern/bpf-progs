@@ -37,7 +37,7 @@ MODS += $(BINDIR)vm_info
 VPATH := .
 
 CC = gcc
-CFLAGS += -O2 -g -Wall
+CFLAGS += -O2 -g -Wall -Werror ${EXTRA_CFLAGS}
 
 INCLUDES  = -I../include -I../include/uapi
 INCLUDES += -I../include/tools
@@ -65,6 +65,7 @@ COMMON += $(OBJDIR)ksyms.o
 COMMON += $(OBJDIR)tp_verify.o
 COMMON += $(OBJDIR)utils.o
 COMMON += $(OBJDIR)hist.o
+COMMON += $(OBJDIR)proc_maps.o
 
 all: build $(MODS)
 
