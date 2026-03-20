@@ -166,13 +166,28 @@ void hist_update(struct hist *h, __u64 val)
 	h->buckets[h->num_buckets - 1]++;
 }
 
+/* normalize to 70 columns) */
+#define NORM_HIST_STR(count, total)  ((count) * 100 / total) * 7 / 10
+
 void hist_print(struct hist *h)
 {
+	char buf[101];
 	__u32 i = 0;
+	__u64 n;
 
 	for (i = 0; i < h->num_buckets-1; ++i) {
-		printf("%7s %-6s : %'8llu\n", "", "", h->buckets[i]);
+		n = NORM_HIST_STR(h->buckets[i], h->entries);
+		if (n == 0 && h->buckets[i])
+			n = 1;
+		memset(buf, '%', n);
+		buf[n] = '\0';
+		printf("%7s %-6s : %s (%llu)\n", "", "", buf, h->buckets[i]);
 		printf("%7.1f %-6s :\n", h->ranges_print[i], h->ranges_unit[i]);
 	}
-	printf("%7s %-6s : %'8llu\n", "", "", h->buckets[i]);
+
+	n = NORM_HIST_STR(h->buckets[i], h->entries);
+	if (n == 0 && h->buckets[i])
+		n = 1;
+	memset(buf, '%', n);
+	printf("%7s %-6s : %s (%llu)\n", "", "", buf, h->buckets[i]);
 }
