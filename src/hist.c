@@ -189,5 +189,6 @@ void hist_print(struct hist *h)
 	if (n == 0 && h->buckets[i])
 		n = 1;
 	memset(buf, '%', n);
+	buf[n] = '\0';
 	printf("%7s %-6s : %s (%llu)\n", "", "", buf, h->buckets[i]);
 }
