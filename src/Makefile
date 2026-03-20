@@ -66,6 +66,7 @@ COMMON += $(OBJDIR)tp_verify.o
 COMMON += $(OBJDIR)utils.o
 COMMON += $(OBJDIR)hist.o
 COMMON += $(OBJDIR)proc_maps.o
+COMMON += $(OBJDIR)tasks.o
 
 all: build $(MODS)
 
