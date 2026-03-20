@@ -5,7 +5,6 @@
  */
 #include <stdbool.h>
 #include <linux/bpf.h>
-#include <linux/rbtree.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +21,7 @@
 #include "perf_events.h"
 #include "kprobes.h"
 #include "timestamps.h"
+#include "tasks.h"
 
 static bool print_time = true;
 static bool print_dt;
@@ -29,95 +29,21 @@ static bool success_only = true;
 static bool done;
 static unsigned int verbose;
 
-struct task {
-	struct rb_node rb_node;
-
+struct exec_task_priv {
 	__u64 time;
-	__u32 tid;
-	__u32 pid;
-	__u32 ppid;
-	char comm[TASK_COMM_LEN];
 	int narg;
 	char *arg[MAXARG + 1];
 };
 
-static struct rb_root all_tasks;
-
-static void remove_task(struct task *task)
+static void exec_task_cleanup(struct task *task)
 {
+	struct exec_task_priv *priv = task_priv(task);
 	int i;
 
-	rb_erase(&task->rb_node, &all_tasks);
-
-	for (i = 0; i < task->narg; ++i) {
-		free(task->arg[i]);
-		task->arg[i] = NULL;
+	for (i = 0; i < priv->narg; ++i) {
+		free(priv->arg[i]);
+		priv->arg[i] = NULL;
 	}
-
-	free(task);
-}
-
-static int insert_task(struct rb_root *root, struct task *new_task)
-{
-	struct rb_node **node = &root->rb_node;
-	struct rb_node *parent = NULL;
-
-	while (*node != NULL) {
-		struct task *task;
-
-		parent = *node;
-		task = container_of(parent, struct task, rb_node);
-		if (task->tid > new_task->tid)
-			node = &(*node)->rb_left;
-		else if (task->tid < new_task->tid)
-			node = &(*node)->rb_right;
-		else
-			return -EEXIST;
-	}
-
-	rb_link_node(&new_task->rb_node, parent, node);
-	rb_insert_color(&new_task->rb_node, root);
-
-	return 0;
-}
-
-static struct task *get_task(struct data *data, bool create)
-{
-	struct rb_node **p = &all_tasks.rb_node;
-	struct rb_node *parent = NULL;
-	__u32 tid = data->tid;
-	struct task *task;
-
-	while (*p != NULL) {
-		parent = *p;
-
-		task = container_of(parent, struct task, rb_node);
-		if (task->tid > tid)
-			p = &(*p)->rb_left;
-		else if (task->tid < tid)
-			p = &(*p)->rb_right;
-		else
-			return task;
-	}
-
-	if (!create)
-		return NULL;
-
-	task = calloc(1, sizeof(*task));
-	if (task) {
-		task->time = data->time;
-		task->tid = data->tid;
-		task->pid = data->pid;
-		task->ppid = data->ppid;
-		strcpy(task->comm, data->comm);
-
-		if (insert_task(&all_tasks, task)) {
-			free(task);
-			task = NULL;
-		}
-	}
-
-	return task;
 }
 
 static void print_header(void)
@@ -156,6 +82,7 @@ static __u64 event_timestamp(struct perf_event_ctx *ctx, void *_data)
 static void process_event(struct perf_event_ctx *ctx, void *_data)
 {
 	struct data *data = _data;
+	struct exec_task_priv *priv;
 	struct task *task;
 	int i;
 
@@ -165,7 +92,14 @@ static void process_event(struct perf_event_ctx *ctx, void *_data)
 			data->comm, data->tid, data->pid,
 			data->comm, data->arg, data);
 
-	task = get_task(data, data->event_type == EVENT_START);
+	if (data->event_type == EVENT_START) {
+		task = task_add(data->comm, data->pid, data->tid, data->ppid,
+				sizeof(struct exec_task_priv), NULL, NULL,
+				exec_task_cleanup);
+	} else {
+		task = task_find(data->pid, data->tid);
+	}
+
 	if (!task) {
 		if (data->event_type != EVENT_EXIT && verbose) {
 			fprintf(stderr,
@@ -176,49 +110,52 @@ static void process_event(struct perf_event_ctx *ctx, void *_data)
 		return;
 	}
 
+	priv = task_priv(task);
+
 	switch (data->event_type) {
 	case EVENT_START:
-		for (i = 0; i < task->narg; ++i) {
-			free(task->arg[i]);
-			task->arg[i] = NULL;
+		for (i = 0; i < priv->narg; ++i) {
+			free(priv->arg[i]);
+			priv->arg[i] = NULL;
 		}
+		priv->time = data->time;
 
 		if (*data->arg)
-			task->arg[0] = strdup(data->arg);
+			priv->arg[0] = strdup(data->arg);
 		else
-			task->arg[0] = strdup("<unknown>");
-		task->narg = 1;
+			priv->arg[0] = strdup("<unknown>");
+		priv->narg = 1;
 		break;
 	case EVENT_ARG:
-		i = task->narg;
+		i = priv->narg;
 		if (*data->arg)
-			task->arg[i] = strdup(data->arg);
+			priv->arg[i] = strdup(data->arg);
 		else
-			task->arg[i] = strdup("<unknown>");
-		task->narg++;
+			priv->arg[i] = strdup("<unknown>");
+		priv->narg++;
 		break;
 	case EVENT_RET:
 		if (!success_only || data->retval == 0) {
 			if (print_time || print_dt)
-				show_timestamps(task->time, data->time);
+				show_timestamps(priv->time, data->time);
 			printf("[%02u] %6d %6d/%-6d %6d   %s ->",
 			       data->cpu, task->ppid, task->tid, task->pid,
 			       data->retval, task->comm);
 
-			for (i = 0; i < task->narg; ++i)
-				printf(" %s", task->arg[i]);
+			for (i = 0; i < priv->narg; ++i)
+				printf(" %s", priv->arg[i]);
 			printf("\n");
 		}
 		if (data->retval)
-			remove_task(task);
+			task_remove(data->pid, data->tid);
 		break;
 	case EVENT_EXIT:
 		if (print_time || print_dt)
-			show_timestamps(task->time, data->time);
+			show_timestamps(priv->time, data->time);
 		printf("[%02u] %6d %6d/%-6d %6s   %s [EXIT]\n",
 		       data->cpu, task->ppid, task->tid, task->pid,
-		       "", data->comm);
-		remove_task(task);
+		       "", task->comm);
+		task_remove(data->pid, data->tid);
 	}
 }
 
@@ -313,6 +250,8 @@ int main(int argc, char **argv)
 		}
 	}
 
+	task_init();
+
 	if (set_reftime())
 		return 1;
 
@@ -348,6 +287,8 @@ int main(int argc, char **argv)
 	/* main event loop */
 	perf_event_loop(&ctx, 1000);
 	rc = 0;
+
+	task_cleanup();
 out:
 	perf_event_close(&ctx);
 	kprobe_cleanup(probes, ARRAY_SIZE(probes));
