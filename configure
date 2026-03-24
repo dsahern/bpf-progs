@@ -8,6 +8,8 @@
 #   KSRC        Location of kernel headers (e.g., source tree)
 #   KBLD        Location of kernel build files (e.g., O= directory)
 
+MAX_CPUS=$(nproc)
+
 # Output file which is input to Makefile
 CONFIG_FINAL=config.mk
 CONFIG=".${CONFIG}.tmp"
@@ -243,24 +245,25 @@ usage()
 Usage: $0 OPTS
 
 OPTS:
-    -l LIBBPF  Path to libbpf install (if not using system version)
-
-    -k KVER    Kernel version to build against (default: $(uname -r))
-    -s KSRC    Location of kernel source
     -b KBLD    Location of kernel build directory
+    -c CPUS    Max cpus to suport (default: $MAX_CPUS)
+    -k KVER    Kernel version to build against (default: $(uname -r))
+    -l LIBBPF  Path to libbpf install (if not using system version)
+    -s KSRC    Location of kernel source
 EOF
 }
 
 ################################################################################
 # main
 
-while getopts :l:k:s:b: o
+while getopts :b:c:k:l:s: o
 do
 	case "$o" in
-	l) LIBBPF_DIR="$OPTARG";;
-	k) KVER="$OPTARG";;
-	s) KSRC="$OPTARG";;
 	b) KBLD="$OPTARG";;
+	c) MAX_CPUS="$OPTARG";;
+	k) KVER="$OPTARG";;
+	l) LIBBPF_DIR="$OPTARG";;
+	s) KSRC="$OPTARG";;
 	*) usage; exit 1;;
 	esac
 done
@@ -268,7 +271,7 @@ done
 echo "# Generated config" >$CONFIG
 quiet_config >> $CONFIG
 
-echo "CFLAGS = -D\"MAX_CPUS=128\"" >> $CONFIG
+echo "CFLAGS = -DMAX_CPUS=${MAX_CPUS}" >> $CONFIG
 
 check_toolchain
 
