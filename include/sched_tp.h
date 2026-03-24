@@ -33,7 +33,6 @@ struct sched_switch_args {
 	field:char comm[16];	offset:8;	size:16;	signed:1;
 	field:pid_t pid;	offset:24;	size:4;	signed:1;
 	field:int prio;	offset:28;	size:4;	signed:1;
-	field:int success;	offset:32;	size:4;	signed:1;
 	field:int target_cpu;	offset:36;	size:4;	signed:1;
  */
 struct sched_wakeup_args {
@@ -42,7 +41,6 @@ struct sched_wakeup_args {
 	char comm[16];
 	pid_t pid;
 	int prio;
-	int success;
 	int target_cpu;
 };
 
