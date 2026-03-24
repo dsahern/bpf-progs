@@ -3,6 +3,12 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#define UPROBE_INIT(p, f) \
+	{ .prog = (p), .func = (f), .fd = -1, .retprobe = 0 }
+
+#define UPROBE_INIT_RET(p, f) \
+	{ .prog = (p), .func = (f), .fd = -1, .retprobe = 1 }
+
 struct uprobe_data {
 	const char *prog;
 	const char *path;
