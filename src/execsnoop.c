@@ -165,6 +165,13 @@ static int execsnoop_complete(struct perf_event_ctx *ctx)
 	return done;
 }
 
+static int expected_data_len(void *_data, unsigned int len)
+{
+	struct data *data = _data;
+
+	return sizeof(*data);
+}
+
 static void sig_handler(int signo)
 {
 	printf("Terminating by signal %d\n", signo);
@@ -211,10 +218,10 @@ int main(int argc, char **argv)
 		NULL
 	};
 	struct perf_event_ctx ctx = {
+		.data_len = expected_data_len,
 		.event_timestamp = event_timestamp,
 		.process_event = process_event,
 		.complete_fn = execsnoop_complete,
-		.data_size = sizeof(struct data),
 	};
 	char *objfile = "execsnoop.o";
 	bool filename_set = false;

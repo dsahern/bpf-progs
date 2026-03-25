@@ -979,6 +979,13 @@ static int check_sort_arg(const char *arg)
 	return 0;
 }
 
+static int expected_data_len(void *_data, unsigned int len)
+{
+	struct data *data = _data;
+
+	return sizeof(*data);
+}
+
 static void sig_handler(int signo)
 {
 	if (signo == SIGALRM) {
@@ -1012,9 +1019,9 @@ static int drop_monitor(const char *prog, int argc, char **argv)
 {
 	const char *kallsyms = "/proc/kallsyms";
 	struct perf_event_ctx ctx = {
+		.data_len = expected_data_len,
 		.output_fn = handle_bpf_output,
 		.complete_fn = pktdrop_complete,
-		.data_size = sizeof(struct data),
 	};
 	char *objfile = "pktdrop.o";
 	bool filename_set = false;

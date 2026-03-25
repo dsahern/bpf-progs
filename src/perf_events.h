@@ -12,6 +12,7 @@ struct perf_event_ctx {
 	perf_buffer_sample_fn output_fn;
 
 	/* users of cache API */
+	int (*data_len)(void *data, unsigned int len);
 	__u64 (*event_timestamp)(struct perf_event_ctx *ctx, void *data);
 	void (*process_event)(struct perf_event_ctx *ctx, void *data);
 
@@ -21,10 +22,10 @@ struct perf_event_ctx {
 	struct perf_buffer *pb;
 	int num_cpus;
 
-	int data_size;
 	int page_size;
 	int page_cnt;  /* pages per mmap */
 	__u64 total_events;
+	__u64 invalid_events;
 	__u64 time_drops;
 	__u64 lost_events;
 };

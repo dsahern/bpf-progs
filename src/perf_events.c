@@ -129,20 +129,24 @@ void perf_event_process_events(struct perf_event_ctx *ctx)
 /*
  * Add event to time sorted backlog queue
  */
-static void perf_output_fn(void *_ctx, int cpu, void *_data, __u32 size)
+static void perf_output_fn(void *_ctx, int cpu, void *data, __u32 size)
 {
 	struct perf_event_ctx *ctx = _ctx;
-	struct data *data = _data;
 	struct event *event;
+	int data_len;
 
-	if (size < ctx->data_size) {
-		fprintf(stderr,
-			"Event size %d is less than data size %d\n",
-			size, ctx->data_size);
+	data_len = ctx->data_len(data, size);
+	if (data_len < 0) {
+		ctx->invalid_events++;
+		return;
+	}
+	/* perf_raw_record adds 4B to record size beyond our data */
+	if (data_len >= size) {
+		ctx->invalid_events++;
 		return;
 	}
 
-	event = malloc(sizeof(*event) + ctx->data_size);
+	event = malloc(sizeof(*event) + data_len);
 	if (!event) {
 		fprintf(stderr, "Failed to allocate memory for event\n");
 		return;
@@ -152,7 +156,7 @@ static void perf_output_fn(void *_ctx, int cpu, void *_data, __u32 size)
 
 	event->time = ctx->event_timestamp(ctx, data);
 	event->cpu = cpu;
-	memcpy(&event->data, data, ctx->data_size);
+	memcpy(&event->data, data, data_len);
 	insert_event(ctx, event);
 	ctx->total_events++;
 }
@@ -217,6 +221,7 @@ void perf_event_close(struct perf_event_ctx *ctx)
 {
 	printf("total events: %llu\n", ctx->total_events);
 	printf("lost events: %llu\n", ctx->lost_events);
+	printf("invalid events: %llu\n", ctx->invalid_events);
 	printf("drops due to time collision: %llu\n", ctx->time_drops);
 
 	perf_buffer__free(ctx->pb);
