@@ -102,3 +102,7 @@ static inline int rb_tree_empty(const struct rb_tree *t)
 void rb_tree_clean(struct rb_tree *t,
 		   void (*clean_fn)(struct rb_node *n, void *priv),
 		   void *priv);
+
+void rb_tree_walk(struct rb_tree *t,
+		  void (*walk_fn)(struct rb_node *n, void *priv),
+		  void *priv);

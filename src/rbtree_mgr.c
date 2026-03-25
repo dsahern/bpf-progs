@@ -95,3 +95,18 @@ void rb_tree_clean(struct rb_tree *t,
 			clean_fn(node, priv);
 	}
 }
+
+void rb_tree_walk(struct rb_tree *t,
+		   void (*walk_fn)(struct rb_node *n, void *priv),
+		   void *priv)
+{
+	struct rb_root *rb_root = &t->root;
+	struct rb_node *node;
+
+	node = rb_first(rb_root);
+	while (node) {
+		walk_fn(node, priv);
+
+		node = rb_next(node);
+	}
+}
