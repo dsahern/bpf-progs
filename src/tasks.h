@@ -38,4 +38,4 @@ static inline void *task_priv(struct task *task)
 	return (void *)task->priv;
 }
 
-
+void task_walk(void (*callback)(struct task *task));

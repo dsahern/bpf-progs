@@ -220,3 +220,16 @@ void task_cleanup(void)
 {
 	rb_tree_clean(&all_tasks, task_free_node, NULL);
 }
+
+static void task_node_walk(struct rb_node *node, void *priv)
+{
+	struct task *t = container_of(node, struct task, rb_node);
+	void (*fn)(struct task *task) = priv;
+
+	fn(t);
+}
+
+void task_walk(void (*callback)(struct task *task))
+{
+	rb_tree_walk(&all_tasks, task_node_walk, callback);
+}
