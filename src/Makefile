@@ -59,6 +59,8 @@ COMMON += $(OBJDIR)hist.o
 COMMON += $(OBJDIR)proc_maps.o
 COMMON += $(OBJDIR)tasks.o
 
+LDLIBS += -lstdc++
+
 all: build $(MODS)
 
 build:
