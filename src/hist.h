@@ -31,4 +31,4 @@ int hist_init(struct hist *h, __u64 *ranges, __u32 num_buckets,
 	      enum hist_units);
 void hist_cleanup(struct hist *h);
 void hist_update(struct hist *h, __u64 val);
-void hist_print(struct hist *h);
+void hist_print(struct hist *h, FILE *fp);

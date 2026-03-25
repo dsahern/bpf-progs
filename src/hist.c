@@ -12,19 +12,19 @@ static void hist_set_print_bytes(struct hist *h)
 
 	for (i = 0; i < h->num_buckets - 1; ++i) {
 		if (h->ranges[i] >= SIZE_TB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_TB(1);
+			h->ranges_print[i] = (double)h->ranges[i] / SIZE_TB(1);
 			h->ranges_unit[i] = "TB";
 		} else if (h->ranges[i] >= SIZE_GB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_GB(1);
+			h->ranges_print[i] = (double)h->ranges[i] / SIZE_GB(1);
 			h->ranges_unit[i] = "GB";
 		} else if (h->ranges[i] >= SIZE_MB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_MB(1);
+			h->ranges_print[i] = (float)h->ranges[i] / SIZE_MB(1);
 			h->ranges_unit[i] = "MB";
 		} else if (h->ranges[i] >= SIZE_KB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_KB(1);
+			h->ranges_print[i] = (float)h->ranges[i] / SIZE_KB(1);
 			h->ranges_unit[i] = "KB";
 		} else {
-			h->ranges_print[i] = h->ranges[i];
+			h->ranges_print[i] = (float)h->ranges[i];
 			h->ranges_unit[i] = "B";
 		}
 	}
@@ -39,19 +39,19 @@ static void hist_set_print_rate(struct hist *h)
 
 	for (i = 0; i < h->num_buckets - 1; ++i) {
 		if (h->ranges[i] >= SIZE_TB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_TB(1);
+			h->ranges_print[i] = (double)h->ranges[i] / SIZE_TB(1);
 			h->ranges_unit[i] = "TB/sec";
 		} else if (h->ranges[i] >= SIZE_GB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_GB(1);
+			h->ranges_print[i] = (double)h->ranges[i] / SIZE_GB(1);
 			h->ranges_unit[i] = "GB/sec";
 		} else if (h->ranges[i] >= SIZE_MB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_MB(1);
+			h->ranges_print[i] = (float)h->ranges[i] / SIZE_MB(1);
 			h->ranges_unit[i] = "MB/sec";
 		} else if (h->ranges[i] >= SIZE_KB(1)) {
-			h->ranges_print[i] = h->ranges[i] / SIZE_KB(1);
+			h->ranges_print[i] = (float)h->ranges[i] / SIZE_KB(1);
 			h->ranges_unit[i] = "KB/sec";
 		} else {
-			h->ranges_print[i] = h->ranges[i];
+			h->ranges_print[i] = (float)h->ranges[i];
 			h->ranges_unit[i] = "B/sec";
 		}
 	}
@@ -66,16 +66,16 @@ static void hist_set_print_nsec(struct hist *h)
 
 	for (i = 0; i < h->num_buckets - 1; ++i) {
 		if (h->ranges[i] >= NSEC_PER_SEC) {
-			h->ranges_print[i] = h->ranges[i] / NSEC_PER_SEC;
+			h->ranges_print[i] = (double)h->ranges[i] / NSEC_PER_SEC;
 			h->ranges_unit[i] = "sec";
 		} else if (h->ranges[i] >= NSEC_PER_MSEC) {
-			h->ranges_print[i] = h->ranges[i] / NSEC_PER_MSEC;
+			h->ranges_print[i] = (double)h->ranges[i] / NSEC_PER_MSEC;
 			h->ranges_unit[i] = "msec";
 		} else if (h->ranges[i] >= NSEC_PER_USEC) {
-			h->ranges_print[i] = h->ranges[i] / NSEC_PER_USEC;
+			h->ranges_print[i] = (float)h->ranges[i] / NSEC_PER_USEC;
 			h->ranges_unit[i] = "usec";
 		} else {
-			h->ranges_print[i] = h->ranges[i];
+			h->ranges_print[i] = (float)h->ranges[i];
 			h->ranges_unit[i] = "nsec";
 		}
 	}
@@ -169,7 +169,7 @@ void hist_update(struct hist *h, __u64 val)
 /* normalize to 70 columns) */
 #define NORM_HIST_STR(count, total)  ((count) * 100 / total) * 7 / 10
 
-void hist_print(struct hist *h)
+void hist_print(struct hist *h, FILE *fp)
 {
 	char buf[101];
 	__u32 i = 0;
@@ -181,8 +181,8 @@ void hist_print(struct hist *h)
 			n = 1;
 		memset(buf, '%', n);
 		buf[n] = '\0';
-		printf("%7s %-6s : %s (%llu)\n", "", "", buf, h->buckets[i]);
-		printf("%7.1f %-6s :\n", h->ranges_print[i], h->ranges_unit[i]);
+		fprintf(fp, "%7s %-6s : %s (%llu)\n", "", "", buf, h->buckets[i]);
+		fprintf(fp, "%7.1f %-6s :\n", h->ranges_print[i], h->ranges_unit[i]);
 	}
 
 	n = NORM_HIST_STR(h->buckets[i], h->entries);
@@ -190,5 +190,5 @@ void hist_print(struct hist *h)
 		n = 1;
 	memset(buf, '%', n);
 	buf[n] = '\0';
-	printf("%7s %-6s : %s (%llu)\n", "", "", buf, h->buckets[i]);
+	fprintf(fp, "%7s %-6s : %s (%llu)\n", "", "", buf, h->buckets[i]);
 }
