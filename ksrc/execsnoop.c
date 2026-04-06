@@ -8,7 +8,6 @@
 #include <bpf/bpf_helpers.h>
 
 #include "execsnoop.h"
-#include "sched_tp.h"
 
 #include "set_current_info.c"
 
@@ -155,7 +154,7 @@ int bpf_sys_exit_execve(struct execve_exit_args *ctx)
 }
 
 SEC("tracepoint/sched/sched_process_exit")
-int bpf_sched_exit(struct sched_exit_args *ctx)
+int bpf_sched_exit(struct trace_event_raw_sched_process_exit *ctx)
 {
 	struct data data = {
 		.time = bpf_ktime_get_ns(),
