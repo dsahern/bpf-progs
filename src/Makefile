@@ -55,7 +55,7 @@ COMMON += $(OBJDIR)print_pkt.o
 COMMON += $(OBJDIR)ksyms.o
 COMMON += $(OBJDIR)tp_verify.o
 COMMON += $(OBJDIR)utils.o
-COMMON += $(OBJDIR)hist.o
+COMMON += $(OBJDIR)stats.o
 COMMON += $(OBJDIR)proc_maps.o
 COMMON += $(OBJDIR)tasks.o
 
