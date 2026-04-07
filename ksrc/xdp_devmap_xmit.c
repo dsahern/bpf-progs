@@ -18,7 +18,7 @@ struct {
 } devmap_xmit_map SEC(".maps");
 
 SEC("tracepoint/xdp/xdp_devmap_xmit")
-int bpf_devmap_xmit(struct devmap_xmit_args *ctx)
+int bpf_devmap_xmit(struct trace_event_raw_xdp_devmap_xmit *ctx)
 {
 	struct devmap_xmit_hist *hist;
 	__u32 idx = 0;
