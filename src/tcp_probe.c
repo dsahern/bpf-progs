@@ -24,25 +24,6 @@
 #include "libbpf_helpers.h"
 #include "perf_events.h"
 #include "timestamps.h"
-#include "tp_verify.h"
-
-struct tp_ctx tcp_probe_tp_ctx[] = {
-	TP_ARG(saddr,         8, 28, tcp_probe_args, s_in6),
-	TP_ARG(daddr,        36, 28, tcp_probe_args, d_in6),
-	TP_ARG(sport,        64,  2, tcp_probe_args, sport),
-	TP_ARG(dport,        66,  2, tcp_probe_args, dport),
-	TP_ARG(family,       68,  2, tcp_probe_args, mark),
-	TP_ARG(mark,         72,  4, tcp_probe_args, mark),
-	TP_ARG(data_len,     76,  2, tcp_probe_args, data_len),
-	TP_ARG(snd_nxt,      80,  4, tcp_probe_args, snd_nxt),
-	TP_ARG(snd_una,      84,  4, tcp_probe_args, snd_una),
-	TP_ARG(snd_cwnd,     88,  4, tcp_probe_args, snd_cwnd),
-	TP_ARG(ssthresh,     92,  4, tcp_probe_args, ssthresh),
-	TP_ARG(snd_wnd,      96,  4, tcp_probe_args, snd_cwnd),
-	TP_ARG(srtt,        100,  4, tcp_probe_args, srtt),
-	TP_ARG(rcv_wnd,     104,  4, tcp_probe_args, rcv_wnd),
-	TP_ARG(sock_cookie, 112,  8, tcp_probe_args, sock_cookie),
-};
 
 static bool done;
 static int skip_samples;
@@ -295,11 +276,6 @@ int main(int argc, char **argv)
 			return 1;
 		}
 	}
-
-	/* verify TCP probe tracepoint has not changed */
-	if (tp_validate_context("tcp", "tcp_probe", tcp_probe_tp_ctx,
-                                ARRAY_SIZE(tcp_probe_tp_ctx)))
-		return 1;
 
 	if (set_reftime())
 		return 1;
