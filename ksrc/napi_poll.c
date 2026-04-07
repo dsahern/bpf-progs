@@ -19,7 +19,7 @@ struct {
 } napi_poll_map SEC(".maps");
 
 SEC("tracepoint/napi/napi_poll")
-int bpf_napi_poll(struct napi_poll_args *ctx)
+int bpf_napi_poll(struct trace_event_raw_napi_poll *ctx)
 {
 	struct napi_poll_hist *hist;
 	__u32 idx = 0;
